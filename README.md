@@ -2,7 +2,7 @@
 
 **Handoff** is a lightweight, system-agnostic healthcare handoff and care-coordination tool designed to reduce delays, miscommunication, and anxiety during patient transitions of care.
 
-It acts as a transparent, trackable “baton pass” between providers, administrators, care coordinators, and families—without replacing or modifying existing EMR systems.
+It acts as a transparent, trackable “baton pass” between providers, administrators, care coordinators, and families—ensuring every transition of care has clear ownership, visibilty, and accountability without replacing existing EMR systems.
 
 
 ## 🚨 The Problem
@@ -10,6 +10,7 @@ It acts as a transparent, trackable “baton pass” between providers, administ
 Healthcare handoffs are broken.
 
 Patients are routinely delayed in receiving care because:
+- When handoffs fail, patients wait longer for treatmentt, providers duplicate work, and critical information can fall through the cracks. 
 - Information is scattered across incompatible systems (Epic, Cerner, Allscripts, etc.)
 - Referrals, labs, and documents are “sent” but not confirmed as received
 - Ownership of the next step is unclear
@@ -25,7 +26,7 @@ Handoff provides a **single source of truth** for patient transitions.
 It does **not** replace EMRs.  
 It **layers on top** of them.
 
-Think of it like a **Domino’s Pizza Tracker for healthcare handoffs**:
+Think of it like a "Domino’s Pizza Tracker" for healthcare handoffs:
 - Everyone can see where the handoff is
 - Who currently owns it
 - What step is next
@@ -113,7 +114,11 @@ This validates the workflow **before** building the web application.
 
 ## 🎯 Vision
 
-Handoff exists to **return clarity, accountability, and dignity** to patient care transitions.
+Handoff exists to return clarity, 
+accountability, and dignity to patient care
+transitions. In healthcare, the moments between 
+provider are often where the system breaks down.
+Handoffs ensure those moments are visible, accountable, and safe.
 
 When handoffs are clear:
 - Care moves faster
