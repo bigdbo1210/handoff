@@ -137,4 +137,4 @@ It is **not** a HIPAA-compliant production system in its current form.
 
 ## 👤 Author
 
-Built by a healthcare professional and systems thinker focused on patient-centered operations, care continuity, and practical technology solutions.
+Built by Derrick D. Dennis Healthcare professional and systems thinker focused on patient-centered operations, care continuity, and practical technology solutions.
