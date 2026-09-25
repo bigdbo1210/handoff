@@ -7,33 +7,86 @@
 <p><strong>Current Owner:</strong> {{ roles.get(h.owner|string, "Unknown") }}</p>
 <p><strong>Status:</strong> {{ h.status }}</p>
 <div class="time" data-time="{{ h.updated_at }}">
-10 just now
+    just now
 </div>
 
 <form method="POST" action="/update-status">
 
 <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-16 <select name="acting_user">
-17 <option value="1" {% if h.owner == 1 %}selected{% endif %}>ED Attending Physician</option>
-18 <option value="2" {% if h.owner == 2 %}selected{% endif %}>Resident Physician</option>
-19 <option value="3" {% if h.owner == 3 %}selected{% endif %}>Registered Nurse (RN)</option>
-20 <option value="4" {% if h.owner == 4 %}selected{% endif %}>Charge Nurse</option>
-21 <option value="5" {% if h.owner == 5 %}selected{% endif %}>Unit Clerk</option>
-22 <option value="6" {% if h.owner == 6 %}selected{% endif %}>Care Coordinator</option>
-23 <option value="7" {% if h.owner == 7 %}selected{% endif %}>Case Manager</option>
+<select name="acting_user">
+<option value="1" {% if h.owner|string == "1" %}selected{% endif %}>ED Attending Physician</option>
+<option value="2" {% if h.owner|string == "2" %}selected{% endif %}>Resident Physician</option>
+<option value="3" {% if h.owner|string == "3" %}selected{% endif %}>Registered Nurse (RN)</option>
+<option value="4" {% if h.owner|string == "4" %}selected{% endif %}>Charge Nurse</option>
+<option value="5" {% if h.owner|string == "5" %}selected{% endif %}>Unit Clerk</option>
+<option value="6" {% if h.owner|string == "6" %}selected{% endif %}>Care Coordinator</option>
+<option value="7" {% if h.owner|string == "7" %}selected{% endif %}>Case Manager</option>
 </select>
 
 <label>Status:</label>
 
-28 <select name="status">
-29 <option value="NEW">NEW</option>
-30 <option value="IN_PROGRESS">IN PROGRESS</option>
-31 <option value="ESCALATED">ESCALATED</option>
-32 <option value="COMPLETED">COMPLETED</option>
-33 </select>
+<select name="status">
+<option value="NEW" {% if h.status == "NEW" %}selected{% endif %}>NEW</option>
+<option value="IN_PROGRESS" {% if h.status == "IN_PROGRESS" %}selected{% endif %}>IN PROGRESS</option>
+<option value="ESCALATED" {% if h.status == "ESCALATED" %}selected{% endif %}>ESCALATED</option>
+<option value="COMPLETED" {% if h.status == "COMPLETED" %}selected{% endif %}>COMPLETED</option>
+</select>
 
 <button type="submit">Update</button>
-
 </form>
+<form method="POST" action="/transfer-owner">
+    <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
 
+    <label>Transfer Ownership:</label>
+
+    <select name="new_owner">
+        <option value="1">ED Attending Physician</option>
+        <option value="2">Resident Physician</option>
+        <option value="3">Registered Nurse (RN)</option>
+        <option value="4">Charge Nurse</option>
+        <option value="5">Unit Clerk</option>
+        <option value="6">Care Coordinator</option>
+        <option value="7">Case Manager</option>
+    </select>
+
+    <button type="submit">Transfer</button>
+</form>
+<details style="margin-top: 12px;">
+    <summary style="cursor: pointer; font-weight: bold;">
+        View History
+    </summary>
+
+    <div style="margin-top: 8px;">
+        {% if h.history %}
+            {% for item in h.history|reverse %}
+                <div style="margin-bottom: 6px;">
+                    <strong>
+                        {{ item.event|replace('_', ' ')|title }}
+                    </strong>
+
+                    {% if item.by %}
+                        <br>
+                        <small>
+                            By:
+{% if 'OWNERSHIP_TRANSFERRED' in item.event %}
+    {% set transfer = item.by.split(' → ') %}
+    {% if transfer|length == 2 %}
+        {{ roles.get(transfer[0]|trim, transfer[0]) }}
+        →
+        {{ roles.get(transfer[1]|trim, transfer[1]) }}
+    {% else %}
+        {{ item.by }}
+    {% endif %}
+{% else %}
+    {{ roles.get(item.by|string, item.by) }}
+{% endif %}
+                        </small>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <small>No history recorded.</small>
+        {% endif %}
+    </div>
+</details>
 </div>

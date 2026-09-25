@@ -90,12 +90,12 @@ STATUSES = ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"]
 ALLOWED_STATUS_TRANSITIONS = {
     "NEW": {"IN_PROGRESS"},
     "IN_PROGRESS": {"ESCALATED", "COMPLETED"},
-    "ESCALATED": {"IN_PROGRESS"},
+    "ESCALATED": {"IN_PROGRESS", "COMPLETED"},
     "COMPLETED": set(),
 }
 
 # Transfer rules
-TRANSFER_ALLOWED_STATUSES = {"CREATED", "IN_PROGRESS", "BLOCKED"}  # NOT COMPLETED
+TRANSFER_ALLOWED_STATUSES = {"NEW", "IN_PROGRESS", "ESCALATED"}  # NOT COMPLETED
 ALLOW_SELF_TRANSFER = False
 
 # Enforcement rules
@@ -103,11 +103,14 @@ ONLY_OWNER_CAN_CHANGE_STATUS = True
 ONLY_OWNER_CAN_TRANSFER = True  # strong default
 # Role permissions for status changes
 ROLE_STATUS_PERMISSIONS = {
-    "1": {"CREATED", "IN_PROGRESS"},      # Registered Nurse
-    "4": {"IN_PROGRESS", "BLOCKED"},      # Charge Nurse
-    "5": {"COMPLETED"}                    # Physician
+    "1": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "2": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "3": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "4": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "5": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "6": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "7": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
 }
-
 
 def is_valid_status(status: str) -> bool:
     return status in STATUSES
@@ -145,7 +148,7 @@ def update_status():
     current_owner = target["owner"]
 
     # 🔒 Owner-only enforcement
-    if acting_user != current_owner:
+    if str(acting_user) != str(current_owner):
         return "Unauthorized: Only current owner can change status", 403
     # Role permission enforcement
     allowed_statuses = ROLE_STATUS_PERMISSIONS.get(acting_user, set())
