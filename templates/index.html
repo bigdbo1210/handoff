@@ -1,0 +1,209 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Handoff Tracker</title>
+    
+    
+    <style>
+       body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .board {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            align-items: flex-start;
+        }
+
+        .column {
+            flex: 1;
+            background: white;
+            border-radius: 6px;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 300px;
+            height: 500px;
+            overflow-y: auto;
+        }
+        .created {
+            border-top: 6px solid #9aa0a6;
+        }
+
+        .in-progress {
+            border-top: 6px solid #1a73e8;
+        }
+
+        .blocked {
+            border-top: 6px solid #d93025;
+        }
+
+        .completed {
+            border-top: 6px solid #188038;
+        }
+        .column h2 {
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-top: 0;
+        }
+
+        .card {
+            background: #fafafa;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+        }
+
+        button {
+            background: #0073e6;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #005bb5;
+        }
+    </style>
+</head>
+<body>
+ <h1>Hospital Handoff Dashboard</h1>
+
+<div class="board">
+    <div class="column new">
+    <h2>NEW</h2>
+        {% for h in handoffs if h["status"] == "NEW" %}
+           {% include "handoff_card.html" %} 
+        {% endfor %}
+    </div>
+
+    <div class="column in-progress">
+    <h2>IN PROGRESS</h2>
+        {% for h in handoffs if h["status"] == "IN_PROGRESS" %}
+            {% include "handoff_card.html" %}
+        {% endfor %}
+    </div>
+
+    <div class="column escalated">
+    <h2>ESCALATED</h2>
+        {% for h in handoffs if h["status"] == "ESCALATED" %}
+            {% include "handoff_card.html" %}
+        {% endfor %}
+    </div>
+
+    <div class="column completed">
+    <h2>COMPLETED</h2>
+        {% for h in handoffs if h["status"] == "COMPLETED" %}
+            {% include "handoff_card.html" %}
+        {% endfor %}
+    </div>
+</div> 
+
+<h1>Handoff Tracker</h1>
+<hr>
+
+<h2>Create New Handoff</h2>
+
+<form method="POST" action="{{ url_for( 'create_handoff' ) }}">
+  <div>
+<label>Patient Name (Last, Initial):</label><br>
+<input type="text" name="patient_name" placeholder="SMITH, J" required>
+</div>
+
+<br>
+
+<div>
+<label>Case ID:</label><br>
+<input type="text" name="case_id" placeholder="A44219" required>
+</div>
+
+<br>
+
+<div>
+<label>Event:</label><br>
+<input type="text" name="event" placeholder="MRI / Lab / Consult" required>
+</div>
+
+<br>
+  <br>
+
+  <div>
+    <label>Initiator:</label><br>
+    <select name="initiator" required>
+      <option value="" disabled selected>-- Select Role --</option>
+      <option value="1">ED Attending Physician</option>
+      <option value="2">Resident Physician</option>
+      <option value="3">Registered Nurse (RN)</option>
+      <option value="4">Charge Nurse</option>
+      <option value="5">Unit Clerk</option>
+      <option value="6">Care Coordinator</option>
+      <option value="7">Case Manager</option>
+    </select>
+  </div>
+
+  <br>
+
+  <div>
+    <label>Current Owner:</label><br>
+    <select name="owner" required>
+      <option value="" disabled selected>-- Select Role --</option>
+      <option value="1">ED Attending Physician</option>
+      <option value="2">Resident Physician</option>
+      <option value="3">Registered Nurse (RN)</option>
+      <option value="4">Charge Nurse</option>
+      <option value="5">Unit Clerk</option>
+      <option value="6">Care Coordinator</option>
+      <option value="7">Case Manager</option>
+    </select>
+  </div>
+
+  <br>
+
+  <button type="submit">Create Handoff</button>
+</form>
+
+<hr>
+
+
+    <div class="muted">No history yet.</div>
+    
+<script>
+document.querySelectorAll('.time').forEach(el => {
+    const time = el.getAttribute('data-time');
+
+    if (time) {
+        const updated = new Date(time);
+        const now = new Date();
+
+        const diffMs = now - updated;
+
+        const diffSeconds = Math.floor(diffMs / 1000);
+        const diffMinutes = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffSeconds < 60) {
+            el.innerText = "just now";
+        } else if (diffMinutes < 60) {
+            el.innerText = diffMinutes + " min ago";
+        } else if (diffHours < 24) {
+            el.innerText = diffHours + " hr ago";
+        } else {
+            el.innerText = diffDays === 1 ? "1 day ago" : diffDays + " days ago";
+        }
+    }
+});
+</script>
+
+</body>
+</html>
+   
+

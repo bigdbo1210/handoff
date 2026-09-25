@@ -1,0 +1,39 @@
+<div class="card">
+
+<h3>Handoff ID: {{ h.handoff_id }}</h3>
+<p><strong>Patient:</strong> {{ h.patient_name }}</p>
+
+<p><strong>Initiator:</strong> {{ roles.get(h.initiator|string, "Unknown") }}</p>
+<p><strong>Current Owner:</strong> {{ roles.get(h.owner|string, "Unknown") }}</p>
+<p><strong>Status:</strong> {{ h.status }}</p>
+<div class="time" data-time="{{ h.updated_at }}">
+10 just now
+</div>
+
+<form method="POST" action="/update-status">
+
+<input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+16 <select name="acting_user">
+17 <option value="1" {% if h.owner == 1 %}selected{% endif %}>ED Attending Physician</option>
+18 <option value="2" {% if h.owner == 2 %}selected{% endif %}>Resident Physician</option>
+19 <option value="3" {% if h.owner == 3 %}selected{% endif %}>Registered Nurse (RN)</option>
+20 <option value="4" {% if h.owner == 4 %}selected{% endif %}>Charge Nurse</option>
+21 <option value="5" {% if h.owner == 5 %}selected{% endif %}>Unit Clerk</option>
+22 <option value="6" {% if h.owner == 6 %}selected{% endif %}>Care Coordinator</option>
+23 <option value="7" {% if h.owner == 7 %}selected{% endif %}>Case Manager</option>
+</select>
+
+<label>Status:</label>
+
+28 <select name="status">
+29 <option value="NEW">NEW</option>
+30 <option value="IN_PROGRESS">IN PROGRESS</option>
+31 <option value="ESCALATED">ESCALATED</option>
+32 <option value="COMPLETED">COMPLETED</option>
+33 </select>
+
+<button type="submit">Update</button>
+
+</form>
+
+</div>
