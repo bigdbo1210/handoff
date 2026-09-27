@@ -36,7 +36,7 @@
 </form>
 <form method="POST" action="/transfer-owner">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-
+    <input type="hidden" name="acting_user" value="{{ h.owner }}">
     <label>Transfer Ownership:</label>
 
     <select name="new_owner">

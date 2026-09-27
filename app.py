@@ -176,6 +176,7 @@ def update_status():
 def transfer_owner():
     handoff_id = request.form["handoff_id"]
     new_owner = request.form["new_owner"]
+    acting_user = request.form.get("acting_user")
 
     handoffs = load_handoffs()
     now = datetime.now(timezone.utc) .isoformat()
@@ -183,6 +184,12 @@ def transfer_owner():
     for h in handoffs:
         if h["handoff_id"] == handoff_id:
             old_owner = h["owner"]
+            if ONLY_OWNER_CAN_TRANSFER and str(acting_user) != str(old_owner):
+                return "Unauthorized: Only current owner can transfer ownership", 403
+
+
+            if not can_transfer(h["status"], str(old_owner), str(new_owner)):
+                return "Transfer not allowed for this handoff", 400
             h["owner"] = new_owner
             h["updated_at"] = now
             h["history"].append({
