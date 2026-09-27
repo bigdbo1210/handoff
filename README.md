@@ -1,140 +1,338 @@
 # Handoff
 
-**Handoff** is a lightweight, system-agnostic healthcare handoff and care-coordination tool designed to reduce delays, miscommunication, and anxiety during patient transitions of care.
+**Handoff** is a healthcare workflow and care-coordination application designed to make responsibility during patient transitions **visible, transferable, time-stamped, and accountable**.
 
-It acts as a transparent, trackable “baton pass” between providers, administrators, care coordinators, and families—ensuring every transition of care has clear ownership, visibilty, and accountability without replacing existing EMR systems.
+Handoff creates a transparent, trackable “baton pass” between the people responsible for moving patient care forward.
 
+The goal is simple:
+
+> **Know where the handoff is. Know who owns it. Know what happens next.**
+
+Handoff is being designed to work alongside existing healthcare systems rather than requiring organizations to replace their electronic medical record (EMR) platforms.
+
+---
 
 ## 🚨 The Problem
 
-Healthcare handoffs are broken.
+Healthcare transitions often involve multiple people, departments, and systems.
 
-Patients are routinely delayed in receiving care because:
-- When handoffs fail, patients wait longer for treatmentt, providers duplicate work, and critical information can fall through the cracks. 
-- Information is scattered across incompatible systems (Epic, Cerner, Allscripts, etc.)
-- Referrals, labs, and documents are “sent” but not confirmed as received
-- Ownership of the next step is unclear
-- Families are left in the dark, increasing anxiety and mistrust
+A referral may be sent.  
+A lab may be ordered.  
+A patient may be waiting for placement.  
+A discharge may require several approvals.
 
-These gaps don’t just slow care—they create real risk.
+But once responsibility changes hands, a basic question can become surprisingly difficult to answer:
 
+> **Who owns the next step right now?**
 
-## 💡 The Solution: Handoff
+When handoffs are unclear:
 
-Handoff provides a **single source of truth** for patient transitions.
+- Patients may wait longer for care.
+- Providers may duplicate work.
+- Information can fall through the cracks.
+- Responsibility for the next action may become unclear.
+- Staff may spend time chasing calls, messages, and updates.
+- Patients and families may be left wondering what is happening and what comes next.
 
-It does **not** replace EMRs.  
-It **layers on top** of them.
+Handoff is being built around that accountability gap.
 
-Think of it like a "Domino’s Pizza Tracker" for healthcare handoffs:
-- Everyone can see where the handoff is
-- Who currently owns it
-- What step is next
-- When it last moved
-- Why it might be blocked
+---
 
-No guessing. No chasing emails. No “I thought they had it.”
+## 💡 The Solution
 
+Handoff provides a visible workflow for transitions of responsibility.
 
-## 🧠 Core Concepts
+It does **not** aim to replace the EMR.
 
-### Handoff Record
-Each handoff includes:
-- Patient reference (MRN or initials + DOB)
-- Initiator (who started the handoff)
-- Current owner (who has the baton)
-- Status (CREATED, IN_PROGRESS, COMPLETED, BLOCKED)
-- Timestamped history of every action
+The long-term vision is for Handoff to function as a workflow and accountability layer that can work alongside existing healthcare technology.
 
-Every action is logged. Nothing is invisible.
+### Think of a pizza tracker — for healthcare handoffs.
 
+When you order a pizza, you can often see when:
 
-## 🔄 Handoff Lifecycle
+- The order was received
+- Preparation started
+- The pizza entered the oven
+- The order was completed
+- Delivery began
+- The order arrived
 
-1. **Created** – Handoff initiated
-2. **In Progress** – Actively being worked
-3. **Blocked** – Action stalled (reason required)
-4. **Completed** – Successfully handed off and closed
+Handoff applies a similar principle to healthcare workflow:
 
-Ownership can be reassigned at any time, with a clear audit trail.
+- What was initiated?
+- Who initiated it?
+- Who currently owns it?
+- What stage is it in?
+- When did it last move?
+- Who received responsibility next?
+- Was it escalated?
+- Was it completed?
 
+Healthcare is obviously far more complex than delivering a pizza.
 
-## 👥 Intended Users
+But the principle is powerful:
 
-- Nursing Home Administrators
-- Care Coordinators
-- Nurses
-- Physicians
-- Social Workers
-- Case Managers
-- Families (read-only, future phase)
+**Important work should not become invisible when responsibility changes hands.**
 
+---
 
-## 🧪 Current State (Prototype)
+## 🏃 The Baton-Pass Model
 
-This repository currently contains a **Python CLI prototype** that demonstrates the core business logic of Handoff:
+The name **Handoff** comes from the relay-race concept of passing a baton.
 
-- Create a handoff
-- List all handoffs
-- View handoff details
-- Update status
-- Change ownership
-- Persist data to JSON
-- Maintain a full history log
+The race cannot continue successfully unless responsibility for the baton moves clearly from one runner to the next.
 
-This validates the workflow **before** building the web application.
+Handoff applies that idea to healthcare.
 
+A physician may initiate a process.
 
-## 🛠️ Tech Stack (Current)
+Responsibility may then move to a nurse.
 
-- Python 3
-- JSON (temporary persistence)
-- CLI interface
+The nurse may transfer responsibility to a care coordinator.
 
+The care coordinator may complete the next step or transfer responsibility again.
 
-## 🛣️ Roadmap
+Handoff creates a visible record of those transitions.
 
-### Phase 1 – Logic Prototype ✅
-- Core handoff model
-- Status rules
+---
+
+## 🔄 Current Handoff Lifecycle
+
+The current web application supports four primary workflow states:
+
+1. **NEW** — A handoff has been created.
+2. **IN PROGRESS** — Work on the handoff is underway.
+3. **ESCALATED** — The handoff requires additional attention.
+4. **COMPLETED** — The handoff has been completed.
+
+The workflow is designed around both **status** and **ownership**.
+
+A handoff's status describes where the work stands.
+
+Its current owner identifies who presently has responsibility for moving it forward.
+
+---
+
+## 👤 Ownership & Accountability
+
+Each handoff currently records information including:
+
+- Patient reference
+- Case ID
+- Event or reason for the handoff
+- Initiator
+- Current owner
+- Current status
+- Created timestamp
+- Updated timestamp
+- Handoff history
+
+Ownership can be transferred between supported roles while preserving the history of the handoff.
+
+This creates a basic chain of accountability:
+
+**Who started it → who received it → what happened → who received it next.**
+
+---
+
+## 📋 Handoff History
+
+Handoff maintains a history of workflow activity.
+
+The current application can record and display events such as:
+
+- Handoff created
+- Status changed
+- Ownership transferred
+- Current owner updated
+
+Instead of displaying internal role IDs to the user, the interface translates ownership history into readable roles.
+
+For example:
+
+**ED Attending Physician → Registered Nurse (RN)**
+
+followed by:
+
+**Registered Nurse (RN) → Care Coordinator**
+
+This allows users to see how responsibility moved through the workflow.
+
+---
+
+## 👥 Current Roles
+
+The current development version includes:
+
+- ED Attending Physician
+- Resident Physician
+- Registered Nurse (RN)
+- Charge Nurse
+- Unit Clerk
+- Care Coordinator
+- Case Manager
+
+These roles are part of the current development model and may evolve as Handoff is tested against real healthcare workflows.
+
+---
+
+## 💻 Current Application
+
+Handoff has progressed beyond its original command-line proof of concept.
+
+The current version includes a working **Flask web application** with a browser-based dashboard.
+
+### Working functionality currently includes:
+
+- Create a new handoff
+- Display active handoffs on a dashboard
+- Assign an initiator
+- Assign a current owner
+- Change workflow status
+- Transfer ownership
+- Preserve ownership-transfer history
+- Display readable role-to-role transfers
+- Track created and updated timestamps
+- Display relative time such as “just now” or “16 min ago”
+- Expand and review handoff history
+- Persist development data using JSON
+
+The application is still under active development.
+
+---
+
+## 🛠️ Current Technology
+
+Handoff currently uses:
+
+- **Python 3**
+- **Flask**
+- **HTML**
+- **CSS**
+- **JavaScript**
+- **JSON** for temporary development persistence
+- **Git/GitHub** for version control
+
+JSON is being used during development and is **not intended to be the production database architecture**.
+
+---
+
+## 🛣️ Development Roadmap
+
+### Phase 1 — Core Workflow Foundation ✅
+
+- Handoff data model
+- Status workflow
+- Ownership model
+- Ownership transfer
 - History tracking
+- JSON persistence
 
-### Phase 2 – Web App (Next)
-- Flask backend
-- Simple web UI
-- Role-based access
-- REST API
+### Phase 2 — Working Web Application 🚧
 
-### Phase 3 – Healthcare-Ready
+- Flask backend ✅
+- Browser-based dashboard ✅
+- Create handoffs ✅
+- Update status ✅
+- Transfer ownership ✅
+- Readable handoff history ✅
+- Timestamp display ✅
+- User authentication
+- Improved role and identity management
+- UI/UX redesign
+- Expanded workflow testing
+
+### Phase 3 — Application Foundation
+
+Planned areas of development include:
+
+- Production database architecture
 - Authentication
-- Permissions
-- Audit compliance
-- EMR-agnostic integration patterns
+- Authorization and permissions
+- User and organization management
+- Stronger audit logging
+- Automated testing
+- Secure configuration
+- API architecture
+- Deployment infrastructure
 
+### Phase 4 — Healthcare Integration & Validation
+
+Future exploration includes:
+
+- Healthcare workflow pilots
+- Clinical and operational user testing
+- Standards-based interoperability
+- FHIR/API integration patterns
+- EMR-compatible workflow integration
+- Security and privacy requirements
+- Compliance assessment
+- Organizational configuration
+- Reporting and workflow analytics
+
+---
+
+## 🔐 Security & Healthcare Compliance
+
+Handoff is currently a development application.
+
+It is **not currently a HIPAA-compliant production system** and should not be used to store or process real protected health information (PHI).
+
+Production deployment in healthcare would require substantial additional work involving areas such as:
+
+- Authentication
+- Authorization
+- Encryption
+- Secure data storage
+- Audit controls
+- Infrastructure security
+- Privacy controls
+- Organizational policies
+- Healthcare regulatory and compliance requirements
+
+Development and testing should use fictional or appropriately de-identified information.
+
+---
 
 ## 🎯 Vision
 
-Handoff exists to return clarity, 
-accountability, and dignity to patient care
-transitions. In healthcare, the moments between 
-provider are often where the system breaks down.
-Handoffs ensure those moments are visible, accountable, and safe.
+Handoff exists to bring **clarity, accountability, visibility, and continuity** to transitions of responsibility in healthcare.
 
-When handoffs are clear:
-- Care moves faster
-- Providers communicate better
-- Administrators gain visibility
-- Families feel informed, not ignored
+The moments between people, departments, and organizations are often where communication becomes difficult.
 
-This project is built from real-world frontline healthcare experience—not theory.
+Handoff is being designed to make those moments visible.
 
+When responsibility is clear:
 
-## ⚠️ Disclaimer
+- Staff can see who owns the next step.
+- Workflow progress becomes easier to understand.
+- Delays and escalations can become more visible.
+- Administrators can better understand workflow movement.
+- Patients and families can ultimately receive greater transparency into the progress of their care.
 
-This is a prototype for educational and conceptual purposes.
-It is **not** a HIPAA-compliant production system in its current form.
+The long-term vision is straightforward:
 
+> **Make responsibility visible.  
+> Make ownership transferable.  
+> Make progress time-stamped.  
+> Make handoffs accountable.**
+
+---
+
+## ⚠️ Development Disclaimer
+
+Handoff is currently under development and is intended for prototype, demonstration, research, and workflow-validation purposes.
+
+It is **not currently a production healthcare system and is not currently intended for use with real patient PHI.**
+
+---
 
 ## 👤 Author
 
-Built by Derrick D. Dennis Healthcare professional and systems thinker focused on patient-centered operations, care continuity, and practical technology solutions.
+**Derrick D. Dennis**
+
+Healthcare professional, entrepreneur, and systems thinker focused on patient-centered operations, care continuity, accountability, and practical technology solutions.
+
+Handoff is being developed from a simple question:
+
+> **When responsibility for patient care changes hands, why shouldn't everyone who needs to know be able to see where the baton is?**
