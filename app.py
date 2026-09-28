@@ -1,8 +1,17 @@
 from flask import Flask, render_template, request, redirect, url_for
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import json
 import os
 from datetime import datetime, timezone
+
 app = Flask(__name__)
+
+app.secret_key = "handoff-dev-secret-key"
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
 # -----------------------------
 # Role Map (Human-Readable Roles)
 # -----------------------------
@@ -19,6 +28,25 @@ ROLE_MAP = {
 
 def role_label(role_id):
     return ROLE_MAP.get(str(role_id), f"Role {role_id}")
+class User(UserMixin):
+    def __init__(self, user_id, name, role_id):
+        self.id = str(user_id)
+        self.name = name
+        self.role_id = str(role_id)
+        self.role_name = role_label(role_id)
+
+USERS = {
+    "1": User("1", "Dr. Carter", "1"),
+    "2": User("2", "Dr. Williams", "2"),
+    "3": User("3", "Nurse Johnson", "3"),
+    "4": User("4", "Nurse Thompson", "4"),
+    "5": User("5", "Alex Morgan", "5"),
+    "6": User("6", "Jordan Lee", "6"),
+    "7": User("7", "Taylor Brooks", "7"),
+}
+@login_manager.user_loader
+def load_user(user_id):
+    return USERS.get(str(user_id))
 
 DATA_FILE = os.path.join(
     os.path.dirname(__file__),
