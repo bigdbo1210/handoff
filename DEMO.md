@@ -28,7 +28,7 @@ All demo accounts share the password **handoff123**.
 |-------------|-----------------|--------------------------|
 | dcarter     | Dr. Carter      | ED Attending Physician   |
 | dwilliams   | Dr. Williams    | Resident Physician       |
-| njohnson    | Nurse Johnson   | Registered Nurse (RN)    |
+| njohnson    | Nina Johnson    | Nurse Practitioner (NP)  |
 | nthompson   | Nurse Thompson  | Charge Nurse             |
 | amorgan     | Alex Morgan     | Unit Clerk               |
 | jlee        | Jordan Lee      | Care Coordinator         |
@@ -59,8 +59,8 @@ In the old world, that's a result nobody is watching. Here, it glows."
 
 **2:00 — The baton (open JOHNSON, M → View History)**
 "Five different people have touched this stroke patient — the attending,
-the resident who ordered the MRI, the RN running it. Read the chain:
-created → order added → baton passed attending to RN → updates. Many hands
+the resident who ordered the MRI, the nurse practitioner running it. Read the chain:
+created → order added → baton passed attending to NP → updates. Many hands
 on the record. Exactly one name on the next step."
 
 **3:00 — The contributor moment (sign in as dwilliams)**

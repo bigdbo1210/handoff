@@ -26,7 +26,7 @@ def build_seed_handoffs():
         return (NOW - timedelta(minutes=minutes_ago)).strftime("%Y%m%d%H%M%S") + "-" + suffix
 
     return [
-    # 1) The hero journey: full baton chain, currently with the RN, in progress.
+    # 1) The hero journey: full baton chain, currently with the NP, in progress.
     {
         "handoff_id": hid(187, "a1b2"),
         "patient_name": "JOHNSON, M",

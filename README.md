@@ -175,6 +175,7 @@ The current development version includes:
 
 - ED Attending Physician
 - Resident Physician
+- Nurse Practitioner (NP)
 - Registered Nurse (RN)
 - Charge Nurse
 - Unit Clerk

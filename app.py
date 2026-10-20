@@ -40,6 +40,7 @@ ROLE_MAP = {
     "5": "Unit Clerk",
     "6": "Care Coordinator",
     "7": "Case Manager",
+    "8": "Nurse Practitioner (NP)",
 }
 
 def role_label(role_id):
@@ -72,7 +73,7 @@ def _make_user(user_id, username, name, role_id):
 USERS = {
     "1": _make_user("1", "dcarter", "Dr. Carter", "1"),
     "2": _make_user("2", "dwilliams", "Dr. Williams", "2"),
-    "3": _make_user("3", "njohnson", "Nurse Johnson", "3"),
+    "3": _make_user("3", "njohnson", "Nina Johnson", "8"),
     "4": _make_user("4", "nthompson", "Nurse Thompson", "4"),
     "5": _make_user("5", "amorgan", "Alex Morgan", "5"),
     "6": _make_user("6", "jlee", "Jordan Lee", "6"),
@@ -207,7 +208,13 @@ def compute_metrics(handoffs):
 def index():
     handoffs = [enrich(h) for h in load_handoffs()]
     metrics = compute_metrics(handoffs)
-    return render_template("index.html", handoffs=handoffs, roles=ROLE_MAP, users=USERS, metrics=metrics)
+    # Display labels: history and ownership fields store user ids, so
+    # resolve them to each user's actual role (people and roles are not
+    # always 1:1 — e.g., Nina Johnson is a Nurse Practitioner).
+    display_roles = dict(ROLE_MAP)
+    for uid, u in USERS.items():
+        display_roles[uid] = u.role_name
+    return render_template("index.html", handoffs=handoffs, roles=display_roles, users=USERS, metrics=metrics)
 
 # -----------------------------
 # Create a handoff
@@ -276,6 +283,7 @@ ROLE_STATUS_PERMISSIONS = {
     "5": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
     "6": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
     "7": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
+    "8": {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"},
 }
 
 def is_valid_status(status: str) -> bool:
