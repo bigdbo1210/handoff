@@ -5,7 +5,14 @@ never enter real patient information (PHI) into this development build.
 
 ---
 
-## Run it
+## Live demo
+
+**https://handoff-demo.onrender.com** — sign in with any demo account below
+(password: handoff123). Hosted on Render's free plan: the service sleeps
+when idle, so the first load can take up to a minute to wake; after that
+it's fast. The board re-seeds itself fresh on every wake-up.
+
+## Run it locally
 
 ```bash
 pip install -r requirements.txt
