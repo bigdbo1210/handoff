@@ -4,72 +4,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Handoff — Sign In</title>
     <style>
-        body { font-family: Arial, sans-serif; background: radial-gradient(1200px 700px at 50% 30%, #16294a 0%, #0b1526 60%, #070f1c 100%); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .stage { text-align: center; padding: 24px; }
-        .brandmark { width: 64px; height: 64px; margin: 0 auto 10px; filter: drop-shadow(0 0 14px rgba(125,180,255,0.45)); animation: rise 0.9s ease-out both; }
-        .wordmark { font-size: 52px; font-weight: 800; letter-spacing: 6px; margin: 0;
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; }
+        .layout { display: flex; min-height: 100vh; }
+        /* ---------- Hero: the picture is the greeting ---------- */
+        .hero { flex: 1.25; background: #e9eff5; display: flex; align-items: center; justify-content: center; padding: 18px; }
+        .hero img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        /* ---------- Sign-in side ---------- */
+        .side { flex: 1; background: radial-gradient(900px 600px at 50% 25%, #16294a 0%, #0b1526 65%, #070f1c 100%); display: flex; align-items: center; justify-content: center; padding: 28px 22px; }
+        .stage { text-align: center; width: 100%; max-width: 380px; }
+        .brandmark { width: 54px; height: 54px; margin: 0 auto 8px; filter: drop-shadow(0 0 14px rgba(125,180,255,0.45)); animation: rise 0.9s ease-out both; }
+        .wordmark { font-size: 42px; font-weight: 800; letter-spacing: 5px; margin: 0;
             background: linear-gradient(90deg, #ffffff 0%, #ffffff 40%, #bcd6ff 50%, #ffffff 60%, #ffffff 100%);
             background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
             -webkit-text-fill-color: transparent; color: transparent;
             animation: shine 2.2s ease-in-out 0.4s 1 forwards; }
         @keyframes shine { to { background-position: -200% center; } }
-        .tagline { color: #9db8dd; font-size: 13px; letter-spacing: 3.5px; text-transform: uppercase; margin: 10px 0 30px; animation: rise 1s ease-out 0.9s both; }
+        .tagline { color: #9db8dd; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; margin: 9px 0 24px; animation: rise 1s ease-out 0.9s both; }
         @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-        .login-card { background: white; border-radius: 10px; padding: 30px 36px; width: 340px; margin: 0 auto; box-shadow: 0 18px 44px rgba(0,0,0,0.45); text-align: left; animation: rise 1s ease-out 1.15s both; }
+        .login-card { background: white; border-radius: 10px; padding: 28px 32px; box-shadow: 0 18px 44px rgba(0,0,0,0.45); text-align: left; animation: rise 1s ease-out 1.15s both; }
         .login-card h2 { margin: 0 0 4px; font-size: 18px; color: #0f1b2d; text-align: center; }
         .login-card .sub { text-align: center; color: #5f6368; font-size: 12.5px; margin-bottom: 10px; }
         label { display: block; font-size: 13px; font-weight: bold; color: #3c4043; margin: 14px 0 5px; }
-        input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 15px; }
+        input { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 15px; }
         button { width: 100%; margin-top: 22px; background: #1a73e8; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 15px; cursor: pointer; }
         button:hover { background: #1558b0; }
         .error { background: #fce8e6; color: #a50e0e; border-radius: 6px; padding: 9px 12px; font-size: 13px; margin-bottom: 6px; }
         .demo-note { margin-top: 20px; background: #f4f6f8; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #5f6368; line-height: 1.5; }
-        @media (max-width: 520px) {
-            .wordmark { font-size: 38px; letter-spacing: 4px; }
-            .brandmark { width: 50px; height: 50px; }
-            .tagline { font-size: 11px; letter-spacing: 2.5px; }
-            .login-card { width: auto; padding: 24px 22px; }
-            .stage { width: 100%; box-sizing: border-box; }
+        @media (max-width: 900px) {
+            .layout { flex-direction: column; }
+            .hero { flex: none; padding: 10px; }
+            .hero img { height: auto; max-height: 44vh; }
+            .side { flex: 1; padding: 22px 16px 30px; }
+            .wordmark { font-size: 34px; letter-spacing: 4px; }
+            .brandmark { width: 44px; height: 44px; }
+            .login-card { padding: 24px 22px; }
         }
     </style>
 </head>
 <body>
-    <div class="stage">
-        <svg class="brandmark" viewBox="0 0 48 48" aria-label="Handoff logo">
-            <path d="M9 32 Q24 8 39 16" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-            <circle cx="9" cy="32" r="5" fill="none" stroke="#ffffff" stroke-width="3.5"/>
-            <circle cx="24" cy="15.6" r="3" fill="#7db4ff"/>
-            <circle cx="39" cy="16" r="5.5" fill="#7db4ff"/>
-        </svg>
-        <h1 class="wordmark">HANDOFF</h1>
-        <div class="tagline">Know who owns the next step</div>
+    <div class="layout">
+        <div class="hero">
+            <img src="{{ url_for('static', filename='img/handoff-hero.jpg') }}" alt="Handoff — Care Coordination: real-time patient handoffs, shared accountability, better continuity of care.">
+        </div>
+        <div class="side">
+            <div class="stage">
+                <svg class="brandmark" viewBox="0 0 48 48" aria-label="Handoff logo">
+                    <path d="M9 32 Q24 8 39 16" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+                    <circle cx="9" cy="32" r="5" fill="none" stroke="#ffffff" stroke-width="3.5"/>
+                    <circle cx="24" cy="15.6" r="3" fill="#7db4ff"/>
+                    <circle cx="39" cy="16" r="5.5" fill="#7db4ff"/>
+                </svg>
+                <h1 class="wordmark">HANDOFF</h1>
+                <div class="tagline">Know who owns the next step</div>
 
-        <div class="login-card">
-            <h2>Sign In</h2>
-            <div class="sub">Care coordination, made visible.</div>
+                <div class="login-card">
+                    <h2>Sign In</h2>
+                    <div class="sub">Care coordination, made visible.</div>
 
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="error">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="error">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
 
-            <form method="POST" action="{{ url_for('login') }}">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" autocomplete="current-password" required>
-                <button type="submit">Sign In</button>
-            </form>
+                    <form method="POST" action="{{ url_for('login') }}">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" autocomplete="current-password" required>
+                        <button type="submit">Sign In</button>
+                    </form>
 
-            <div class="demo-note">
-                <strong>Demo accounts</strong> (password for all: <em>handoff123</em>)<br>
-                dcarter — ED Attending Physician<br>
-                njohnson — Nina Johnson, Nurse Practitioner (NP)<br>
-                jlee — Care Coordinator<br>
-                tbrooks — Case Manager
+                    <div class="demo-note">
+                        <strong>Demo accounts</strong> (password for all: <em>handoff123</em>)<br>
+                        dcarter — ED Attending Physician<br>
+                        njohnson — Nina Johnson, Nurse Practitioner (NP)<br>
+                        jlee — Care Coordinator<br>
+                        tbrooks — Case Manager
+                    </div>
+                </div>
             </div>
         </div>
     </div>
