@@ -12,6 +12,14 @@ Handoff is being designed to work alongside existing healthcare systems rather t
 
 ---
 
+## 🔴 Live Demo
+
+**Try it now: [handoff-demo.onrender.com](https://handoff-demo.onrender.com)**
+
+Sign in with a demo account — username `dcarter`, password `handoff123` (additional accounts are listed on the sign-in page). All patients are fictional. The demo is hosted on a free plan that sleeps when idle, so the first load may take up to a minute. See [DEMO.md](DEMO.md) for a guided five-minute walkthrough.
+
+---
+
 ## 🚨 The Problem
 
 Healthcare transitions often involve multiple people, departments, and systems.
@@ -145,6 +153,7 @@ The current application can record and display events such as:
 - Status changed
 - Ownership transferred
 - Current owner updated
+- Record entries — notes, orders, and updates added by any care team member (the record is collaborative; the baton is not)
 
 Instead of displaying internal role IDs to the user, the interface translates ownership history into readable roles.
 
@@ -184,17 +193,22 @@ The current version includes a working **Flask web application** with a browser-
 
 ### Working functionality currently includes:
 
-- Create a new handoff
+- Secure user login with named accounts — baton actions (status change, transfer, completion) are enforced against the signed-in user, and only the current owner can perform them
+- Create a new handoff (the initiator is recorded automatically from the signed-in user)
 - Display active handoffs on a dashboard
-- Assign an initiator
 - Assign a current owner
 - Change workflow status
 - Transfer ownership
+- Contributor record entries — any care team member can add notes, orders, and updates to a handoff's record without moving the baton
+- Executive metrics strip — live counts by status, handoffs "waiting too long," and average completion time
+- Time-with-owner display, with handoffs that sit too long highlighted amber, then red
 - Preserve ownership-transfer history
 - Display readable role-to-role transfers
 - Track created and updated timestamps
 - Display relative time such as “just now” or “16 min ago”
 - Expand and review handoff history
+- Responsive layout for phone, tablet, and desktop
+- A hosted live demo (see above)
 - Persist development data using JSON
 
 The application is still under active development.
@@ -207,11 +221,14 @@ Handoff currently uses:
 
 - **Python 3**
 - **Flask**
+- **Flask-Login** for authentication
+- **Gunicorn** as the production server
 - **HTML**
 - **CSS**
 - **JavaScript**
 - **JSON** for temporary development persistence
 - **Git/GitHub** for version control
+- **Render** hosting the live demo
 
 JSON is being used during development and is **not intended to be the production database architecture**.
 
@@ -237,24 +254,24 @@ JSON is being used during development and is **not intended to be the production
 - Transfer ownership ✅
 - Readable handoff history ✅
 - Timestamp display ✅
-- User authentication
-- Improved role and identity management
-- UI/UX redesign
-- Expanded workflow testing
+- User authentication ✅
+- Improved role and identity management ✅ (named accounts; ownership rules enforced against the signed-in user)
+- UI/UX redesign 🚧 (branding and responsive layout complete; refinement ongoing)
+- Expanded workflow testing ✅ (29 end-to-end checks — `tests/test_workflow.py`)
 
 ### Phase 3 — Application Foundation
 
 Planned areas of development include:
 
 - Production database architecture
-- Authentication
+- Enterprise authentication (SSO/SAML, MFA)
 - Authorization and permissions
 - User and organization management
 - Stronger audit logging
-- Automated testing
+- Automated testing in CI
 - Secure configuration
 - API architecture
-- Deployment infrastructure
+- Production deployment infrastructure
 
 ### Phase 4 — Healthcare Integration & Validation
 
