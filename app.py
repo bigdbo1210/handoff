@@ -82,6 +82,28 @@ USERS = {
 
 USERS_BY_USERNAME = {u.username: u for u in USERS.values()}
 
+_AVATAR_COLORS = ["#1a73e8", "#7b1fa2", "#188038", "#e8710a", "#0097a7", "#c2185b", "#5f6368"]
+
+def initials_of(name):
+    parts = [p for p in name.replace(".", "").split() if p.lower() not in ("dr", "nurse")]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+def user_meta():
+    """Display metadata per user id: name, role, avatar initials + color."""
+    return {
+        uid: {
+            "name": u.name,
+            "role": u.role_name,
+            "initials": initials_of(u.name),
+            "color": _AVATAR_COLORS[(int(uid) - 1) % len(_AVATAR_COLORS)],
+        }
+        for uid, u in USERS.items()
+    }
+
 @login_manager.user_loader
 def load_user(user_id):
     return USERS.get(str(user_id))
@@ -206,15 +228,30 @@ def compute_metrics(handoffs):
 @app.route("/")
 @login_required
 def index():
-    handoffs = [enrich(h) for h in load_handoffs()]
-    metrics = compute_metrics(handoffs)
+    all_handoffs = [enrich(h) for h in load_handoffs()]
+    metrics = compute_metrics(all_handoffs)
     # Display labels: history and ownership fields store user ids, so
     # resolve them to each user's actual role (people and roles are not
     # always 1:1 — e.g., Nina Johnson is a Nurse Practitioner).
     display_roles = dict(ROLE_MAP)
     for uid, u in USERS.items():
         display_roles[uid] = u.role_name
-    return render_template("index.html", handoffs=handoffs, roles=display_roles, users=USERS, metrics=metrics)
+    meta = user_meta()
+    # Board search: match patient, case, event, or a team member's name/role.
+    q = (request.args.get("q") or "").strip()
+    handoffs = all_handoffs
+    if q:
+        needle = q.lower()
+        def matches(h):
+            fields = [h.get("patient_name", ""), h.get("case_id", ""), h.get("event", "")]
+            for key in ("owner", "initiator"):
+                m = meta.get(str(h.get(key)))
+                if m:
+                    fields += [m["name"], m["role"]]
+            return any(needle in str(f).lower() for f in fields)
+        handoffs = [h for h in all_handoffs if matches(h)]
+    return render_template("index.html", handoffs=handoffs, roles=display_roles, users=USERS,
+                           metrics=metrics, user_meta=meta, q=q, total_count=len(all_handoffs))
 
 # -----------------------------
 # Create a handoff
@@ -234,11 +271,16 @@ def create_handoff():
     handoffs = load_handoffs()
     ts = now_iso()
 
+    age = (request.form.get("patient_age") or "").strip()
+    sex = (request.form.get("patient_sex") or "").strip().upper()
+
     new_handoff = {
         "handoff_id": new_handoff_id(),
         "patient_name": patient_name,
         "case_id": case_id,
         "event": event,
+        "age": age if age else None,
+        "sex": sex if sex in ("M", "F") else None,
         # The initiator is whoever is signed in and creates the handoff —
         # accountability starts with a real identity, not a dropdown.
         "initiator": int(current_user.id),

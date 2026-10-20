@@ -30,6 +30,8 @@ def build_seed_handoffs():
     {
         "handoff_id": hid(187, "a1b2"),
         "patient_name": "JOHNSON, M",
+        "age": 71,
+        "sex": "F",
         "case_id": "A44219",
         "event": "MRI — Stroke Protocol",
         "initiator": 1,
@@ -50,6 +52,8 @@ def build_seed_handoffs():
     {
         "handoff_id": hid(322, "c3d4"),
         "patient_name": "GARCIA, L",
+        "age": 82,
+        "sex": "F",
         "case_id": "B77102",
         "event": "Discharge — SNF Placement",
         "initiator": 7,
@@ -70,6 +74,8 @@ def build_seed_handoffs():
     {
         "handoff_id": hid(148, "e5f6"),
         "patient_name": "SMITH, J",
+        "age": 68,
+        "sex": "M",
         "case_id": "C30981",
         "event": "Lab — Troponin Follow-Up",
         "initiator": 2,
@@ -85,6 +91,8 @@ def build_seed_handoffs():
     {
         "handoff_id": hid(410, "g7h8"),
         "patient_name": "BROWN, D",
+        "age": 58,
+        "sex": "M",
         "case_id": "D55231",
         "event": "Bed Assignment — Telemetry",
         "initiator": 1,
@@ -104,6 +112,8 @@ def build_seed_handoffs():
     {
         "handoff_id": hid(38, "i9j0"),
         "patient_name": "LEE, K",
+        "age": 65,
+        "sex": "M",
         "case_id": "E90214",
         "event": "Cardiology Consult",
         "initiator": 3,

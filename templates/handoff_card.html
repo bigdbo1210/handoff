@@ -1,25 +1,34 @@
 <div class="card{% if h.stale_level %} stale-{{ h.stale_level }}{% endif %}">
 
-<h3>{{ h.event }} — Case {{ h.case_id }}</h3>
-<p><strong>Patient:</strong> {{ h.patient_name }}</p>
-<p><strong>Initiator:</strong> {{ roles.get(h.initiator|string, "Unknown") }}</p>
-<p><strong>Current Owner:</strong> {{ roles.get(h.owner|string, "Unknown") }}{% if h.owner|string == current_user.id %} <em>(you)</em>{% endif %}</p>
-<p><strong>Status:</strong> {{ h.status.replace('_', ' ') }}</p>
-<p>
-    {% if h.age_minutes is not none and h.status != "COMPLETED" %}
-        {% if h.age_minutes < 60 %}
-            <span class="age{% if h.stale_level %} {{ h.stale_level }}{% endif %}">With owner for {{ h.age_minutes }} min</span>
-        {% else %}
-            <span class="age{% if h.stale_level %} {{ h.stale_level }}{% endif %}">With owner for {{ h.age_minutes // 60 }} hr {{ h.age_minutes % 60 }} min</span>
-        {% endif %}
+<div class="card-head">
+    <div class="card-title">{{ h.event }}</div>
+    <div class="card-dots">•••</div>
+</div>
+<div class="card-case">Case {{ h.case_id }}</div>
+<div class="card-patient">{{ h.patient_name }}{% if h.age %} &nbsp;|&nbsp; {{ h.age }} y/o{% endif %}{% if h.sex %} &nbsp;|&nbsp; {{ h.sex }}{% endif %}</div>
+
+<div class="card-meta">
+    {% if h.status == "COMPLETED" %}
+        <span class="pill done">&#10003; <span class="time" data-time="{{ h.updated_at }}">just now</span></span>
+    {% else %}
+        <span class="pill{% if h.stale_level %} {{ h.stale_level }}{% endif %}"><span class="time" data-time="{{ h.updated_at }}">just now</span></span>
     {% endif %}
-    <span class="time" data-time="{{ h.updated_at }}">just now</span>
-</p>
+</div>
+
+{% set om = user_meta.get(h.owner|string) %}
+<div class="owner-row">
+    <div class="avatar" style="background: {{ om.color if om else '#5f6368' }}">{{ om.initials if om else '?' }}</div>
+    <div class="owner-text">
+        <div class="owner-name">{{ om.name if om else 'Unknown' }}{% if h.owner|string == current_user.id %} <em>(you)</em>{% endif %}</div>
+        <div class="owner-role">{{ om.role if om else '' }}</div>
+    </div>
+</div>
+<div class="initiator-line">Initiated by {{ user_meta.get(h.initiator|string).name if user_meta.get(h.initiator|string) else 'Unknown' }} · {{ roles.get(h.initiator|string, "") }}</div>
 
 {% if h.owner|string == current_user.id and h.status != "COMPLETED" %}
-<form method="POST" action="/update-status" style="margin-top:8px;">
+<form method="POST" action="/update-status" class="action-form">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-    <label style="font-size:12px; font-weight:bold;">Status:</label>
+    <label>Status:</label>
     <select name="status">
         <option value="NEW" {% if h.status == "NEW" %}selected{% endif %}>NEW</option>
         <option value="IN_PROGRESS" {% if h.status == "IN_PROGRESS" %}selected{% endif %}>IN PROGRESS</option>
@@ -29,9 +38,9 @@
     <button type="submit">Update</button>
 </form>
 
-<form method="POST" action="/transfer-owner" style="margin-top:8px;">
+<form method="POST" action="/transfer-owner" class="action-form">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-    <label style="font-size:12px; font-weight:bold;">Pass the baton to:</label>
+    <label>Pass the baton to:</label>
     <select name="new_owner">
         {% for uid, u in users.items() %}
             {% if uid != current_user.id %}
@@ -42,14 +51,14 @@
     <button type="submit">Transfer</button>
 </form>
 {% elif h.status != "COMPLETED" %}
-<p style="font-size:12px; color:#5f6368;">Only the current owner can change status or pass the baton.</p>
+<p class="owner-note">Only the current owner can change status or pass the baton.</p>
 {% endif %}
 
-<form method="POST" action="/add-note" style="margin-top:10px;">
+<form method="POST" action="/add-note" class="note-form">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-    <label style="font-size:12px; font-weight:bold;">Add to the record (any team member):</label>
+    <label>Add to the record (any team member):</label>
     <textarea name="text" rows="2" maxlength="1000" placeholder="Note, order, or update for this handoff..." required></textarea>
-    <div style="margin-top:5px;">
+    <div class="note-row">
         <select name="note_type">
             <option value="NOTE">Note</option>
             <option value="ORDER">Order</option>
@@ -59,9 +68,9 @@
     </div>
 </form>
 
-<details style="margin-top: 12px;">
-    <summary style="cursor: pointer; font-weight: bold;">View History</summary>
-    <div style="margin-top: 8px;">
+<details class="history">
+    <summary>View History</summary>
+    <div class="history-body">
         {% if h.history %}
             {% for item in h.history|reverse %}
                 <div class="history-item">
