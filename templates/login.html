@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Handoff — Sign In</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0f1b2d; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-card { background: white; border-radius: 10px; padding: 36px 40px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+        .brand { text-align: center; margin-bottom: 6px; }
+        .brand .mark { font-size: 40px; }
+        h1 { text-align: center; margin: 4px 0 2px; font-size: 26px; color: #0f1b2d; }
+        .tagline { text-align: center; color: #5f6368; font-size: 13px; margin-bottom: 22px; }
+        label { display: block; font-size: 13px; font-weight: bold; color: #3c4043; margin: 14px 0 5px; }
+        input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 15px; }
+        button { width: 100%; margin-top: 22px; background: #1a73e8; color: white; border: none; padding: 11px; border-radius: 6px; font-size: 15px; cursor: pointer; }
+        button:hover { background: #1558b0; }
+        .error { background: #fce8e6; color: #a50e0e; border-radius: 6px; padding: 9px 12px; font-size: 13px; margin-bottom: 6px; }
+        .demo-note { margin-top: 20px; background: #f4f6f8; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #5f6368; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="brand"><span class="mark">🏃</span></div>
+        <h1>Handoff</h1>
+        <div class="tagline">Know where the handoff is. Know who owns it.<br>Know what happens next.</div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="error">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <button type="submit">Sign In</button>
+        </form>
+
+        <div class="demo-note">
+            <strong>Demo accounts</strong> (password for all: <em>handoff123</em>)<br>
+            dcarter — ED Attending Physician<br>
+            njohnson — Registered Nurse (RN)<br>
+            jlee — Care Coordinator<br>
+            tbrooks — Case Manager
+        </div>
+    </div>
+</body>
+</html>

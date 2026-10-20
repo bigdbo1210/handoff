@@ -1,87 +1,90 @@
-<div class="card">
+<div class="card{% if h.stale_level %} stale-{{ h.stale_level }}{% endif %}">
 
-<h3>Handoff ID: {{ h.handoff_id }}</h3>
+<h3>{{ h.event }} — Case {{ h.case_id }}</h3>
 <p><strong>Patient:</strong> {{ h.patient_name }}</p>
-
 <p><strong>Initiator:</strong> {{ roles.get(h.initiator|string, "Unknown") }}</p>
-<p><strong>Current Owner:</strong> {{ roles.get(h.owner|string, "Unknown") }}</p>
-<p><strong>Status:</strong> {{ h.status }}</p>
-<div class="time" data-time="{{ h.updated_at }}">
-    just now
-</div>
+<p><strong>Current Owner:</strong> {{ roles.get(h.owner|string, "Unknown") }}{% if h.owner|string == current_user.id %} <em>(you)</em>{% endif %}</p>
+<p><strong>Status:</strong> {{ h.status.replace('_', ' ') }}</p>
+<p>
+    {% if h.age_minutes is not none and h.status != "COMPLETED" %}
+        {% if h.age_minutes < 60 %}
+            <span class="age{% if h.stale_level %} {{ h.stale_level }}{% endif %}">With owner for {{ h.age_minutes }} min</span>
+        {% else %}
+            <span class="age{% if h.stale_level %} {{ h.stale_level }}{% endif %}">With owner for {{ h.age_minutes // 60 }} hr {{ h.age_minutes % 60 }} min</span>
+        {% endif %}
+    {% endif %}
+    <span class="time" data-time="{{ h.updated_at }}">just now</span>
+</p>
 
-<form method="POST" action="/update-status">
-
-<input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-<select name="acting_user">
-<option value="1" {% if h.owner|string == "1" %}selected{% endif %}>ED Attending Physician</option>
-<option value="2" {% if h.owner|string == "2" %}selected{% endif %}>Resident Physician</option>
-<option value="3" {% if h.owner|string == "3" %}selected{% endif %}>Registered Nurse (RN)</option>
-<option value="4" {% if h.owner|string == "4" %}selected{% endif %}>Charge Nurse</option>
-<option value="5" {% if h.owner|string == "5" %}selected{% endif %}>Unit Clerk</option>
-<option value="6" {% if h.owner|string == "6" %}selected{% endif %}>Care Coordinator</option>
-<option value="7" {% if h.owner|string == "7" %}selected{% endif %}>Case Manager</option>
-</select>
-
-<label>Status:</label>
-
-<select name="status">
-<option value="NEW" {% if h.status == "NEW" %}selected{% endif %}>NEW</option>
-<option value="IN_PROGRESS" {% if h.status == "IN_PROGRESS" %}selected{% endif %}>IN PROGRESS</option>
-<option value="ESCALATED" {% if h.status == "ESCALATED" %}selected{% endif %}>ESCALATED</option>
-<option value="COMPLETED" {% if h.status == "COMPLETED" %}selected{% endif %}>COMPLETED</option>
-</select>
-
-<button type="submit">Update</button>
-</form>
-<form method="POST" action="/transfer-owner">
+{% if h.owner|string == current_user.id and h.status != "COMPLETED" %}
+<form method="POST" action="/update-status" style="margin-top:8px;">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
-    <input type="hidden" name="acting_user" value="{{ h.owner }}">
-    <label>Transfer Ownership:</label>
-
-    <select name="new_owner">
-        <option value="1">ED Attending Physician</option>
-        <option value="2">Resident Physician</option>
-        <option value="3">Registered Nurse (RN)</option>
-        <option value="4">Charge Nurse</option>
-        <option value="5">Unit Clerk</option>
-        <option value="6">Care Coordinator</option>
-        <option value="7">Case Manager</option>
+    <label style="font-size:12px; font-weight:bold;">Status:</label>
+    <select name="status">
+        <option value="NEW" {% if h.status == "NEW" %}selected{% endif %}>NEW</option>
+        <option value="IN_PROGRESS" {% if h.status == "IN_PROGRESS" %}selected{% endif %}>IN PROGRESS</option>
+        <option value="ESCALATED" {% if h.status == "ESCALATED" %}selected{% endif %}>ESCALATED</option>
+        <option value="COMPLETED" {% if h.status == "COMPLETED" %}selected{% endif %}>COMPLETED</option>
     </select>
+    <button type="submit">Update</button>
+</form>
 
+<form method="POST" action="/transfer-owner" style="margin-top:8px;">
+    <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+    <label style="font-size:12px; font-weight:bold;">Pass the baton to:</label>
+    <select name="new_owner">
+        {% for uid, u in users.items() %}
+            {% if uid != current_user.id %}
+                <option value="{{ uid }}">{{ u.role_name }} — {{ u.name }}</option>
+            {% endif %}
+        {% endfor %}
+    </select>
     <button type="submit">Transfer</button>
 </form>
-<details style="margin-top: 12px;">
-    <summary style="cursor: pointer; font-weight: bold;">
-        View History
-    </summary>
+{% elif h.status != "COMPLETED" %}
+<p style="font-size:12px; color:#5f6368;">Only the current owner can change status or pass the baton.</p>
+{% endif %}
 
+<form method="POST" action="/add-note" style="margin-top:10px;">
+    <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+    <label style="font-size:12px; font-weight:bold;">Add to the record (any team member):</label>
+    <textarea name="text" rows="2" maxlength="1000" placeholder="Note, order, or update for this handoff..." required></textarea>
+    <div style="margin-top:5px;">
+        <select name="note_type">
+            <option value="NOTE">Note</option>
+            <option value="ORDER">Order</option>
+            <option value="UPDATE">Update</option>
+        </select>
+        <button type="submit" class="secondary">Add to Record</button>
+    </div>
+</form>
+
+<details style="margin-top: 12px;">
+    <summary style="cursor: pointer; font-weight: bold;">View History</summary>
     <div style="margin-top: 8px;">
         {% if h.history %}
             {% for item in h.history|reverse %}
-                <div style="margin-bottom: 6px;">
-                    <strong>
-                        {{ item.event|replace('_', ' ')|title }}
-                    </strong>
-
-                    {% if item.by %}
-                        <br>
+                <div class="history-item">
+                    {% if item.event == "RECORD_ADDED" %}
+                        <strong>{{ item.type|title }} added</strong> by {{ roles.get(item.by|string, item.by) }}
+                        <div class="record-text">{{ item.text }}</div>
+                    {% elif item.event == "OWNERSHIP_TRANSFERRED" %}
+                        <strong>Ownership Transferred</strong><br>
                         <small>
-                            By:
-{% if 'OWNERSHIP_TRANSFERRED' in item.event %}
-    {% set transfer = item.by.split(' → ') %}
-    {% if transfer|length == 2 %}
-        {{ roles.get(transfer[0]|trim, transfer[0]) }}
-        →
-        {{ roles.get(transfer[1]|trim, transfer[1]) }}
-    {% else %}
-        {{ item.by }}
-    {% endif %}
-{% else %}
-    {{ roles.get(item.by|string, item.by) }}
-{% endif %}
+                            {% set transfer = item.by.split(' → ') %}
+                            {% if transfer|length == 2 %}
+                                {{ roles.get(transfer[0]|trim, transfer[0]) }} → {{ roles.get(transfer[1]|trim, transfer[1]) }}
+                            {% else %}
+                                {{ item.by }}
+                            {% endif %}
                         </small>
+                    {% else %}
+                        <strong>{{ item.event|replace('_', ' ')|title }}</strong>
+                        {% if item.by is defined %}
+                            <br><small>By: {{ roles.get(item.by|string, item.by) }}</small>
+                        {% endif %}
                     {% endif %}
+                    <br><small class="time" data-time="{{ item.at }}">just now</small>
                 </div>
             {% endfor %}
         {% else %}
