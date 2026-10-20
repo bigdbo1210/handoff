@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Handoff — Hospital Handoff Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Handoff — Care Coordination Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; background: #eef1f4; margin: 0; padding: 0; color: #202124; }
         .topbar { background: #0f1b2d; color: white; padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
@@ -45,11 +46,30 @@
         details summary { font-size: 13px; }
         .history-item { margin-bottom: 7px; font-size: 12.5px; }
         .record-text { background: #fff; border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 8px; margin-top: 3px; }
+        .brandmark-sm { width: 26px; height: 26px; vertical-align: -6px; margin-right: 9px; }
+        .wordmark-sm { font-weight: 800; letter-spacing: 2.5px; font-size: 19px;
+            background: linear-gradient(90deg, #ffffff 0%, #ffffff 40%, #bcd6ff 50%, #ffffff 60%, #ffffff 100%);
+            background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent; color: transparent;
+            animation: shine 2.2s ease-in-out 0.3s 1 forwards; }
+        @keyframes shine { to { background-position: -200% center; } }
+        .brand-sub { color: #8ea6c8; font-size: 12.5px; letter-spacing: 1.6px; text-transform: uppercase; margin-left: 12px; }
+        @media (max-width: 900px) {
+            .board { flex-direction: column; padding: 14px; }
+            .column { width: 100%; box-sizing: border-box; max-height: none; }
+            .metrics { padding: 12px 14px 0; gap: 10px; }
+            .metric { flex: 1 1 28%; min-width: 96px; padding: 8px 12px; }
+            .metric .num { font-size: 20px; }
+            .topbar { flex-wrap: wrap; gap: 8px; padding: 12px 14px; }
+            .create-wrap { margin: 0 14px 20px; }
+            button { padding: 9px 14px; }
+            select, input[type="text"], textarea { font-size: 16px; }
+        }
     </style>
 </head>
 <body>
     <div class="topbar">
-        <div class="brand">🏃 Handoff <span>— Hospital Dashboard</span></div>
+        <div class="brand"><svg class="brandmark-sm" viewBox="0 0 48 48" aria-label="Handoff logo"><path d="M9 32 Q24 8 39 16" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/><circle cx="9" cy="32" r="5" fill="none" stroke="#ffffff" stroke-width="3.5"/><circle cx="24" cy="15.6" r="3" fill="#7db4ff"/><circle cx="39" cy="16" r="5.5" fill="#7db4ff"/></svg><span class="wordmark-sm">HANDOFF</span><span class="brand-sub">Care Coordination</span></div>
         <div class="userbox">
             Signed in as <strong>{{ current_user.name }}</strong> · {{ current_user.role_name }}
             <a href="{{ url_for('logout') }}">Sign out</a>
