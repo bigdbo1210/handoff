@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Handoff — Hospital Handoff Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #eef1f4; margin: 0; padding: 0; color: #202124; }
+        .topbar { background: #0f1b2d; color: white; padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
+        .topbar .brand { font-size: 20px; font-weight: bold; }
+        .topbar .brand span { color: #8ab4f8; }
+        .topbar .userbox { font-size: 13px; color: #c9d4e3; }
+        .topbar .userbox a { color: #8ab4f8; margin-left: 12px; text-decoration: none; }
+        .metrics { display: flex; gap: 14px; padding: 16px 22px 2px; flex-wrap: wrap; }
+        .metric { background: white; border-radius: 8px; padding: 10px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); min-width: 110px; }
+        .metric .num { font-size: 24px; font-weight: bold; }
+        .metric .lbl { font-size: 11px; color: #5f6368; text-transform: uppercase; letter-spacing: 0.6px; }
+        .metric.alert .num { color: #d93025; }
+        .board { display: flex; gap: 16px; padding: 18px 22px; align-items: flex-start; }
+        .column { flex: 1; background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); min-height: 300px; max-height: 74vh; overflow-y: auto; }
+        .column h2 { text-align: center; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; margin: 0 0 12px; font-size: 16px; }
+        .column.new { border-top: 6px solid #9aa0a6; }
+        .column.in-progress { border-top: 6px solid #1a73e8; }
+        .column.escalated { border-top: 6px solid #d93025; }
+        .column.completed { border-top: 6px solid #188038; }
+        .card { background: #fafafa; border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 8px; }
+        .card.stale-amber { border-left: 6px solid #f9ab00; }
+        .card.stale-red { border-left: 6px solid #d93025; background: #fdf3f2; }
+        .card h3 { margin: 0 0 6px; font-size: 14px; }
+        .card p { margin: 3px 0; font-size: 13px; }
+        .age { display: inline-block; font-size: 12px; font-weight: bold; padding: 2px 8px; border-radius: 10px; background: #e8f0fe; color: #174ea6; }
+        .age.amber { background: #fef7e0; color: #b06000; }
+        .age.red { background: #fce8e6; color: #a50e0e; }
+        .time { font-size: 12px; color: #5f6368; }
+        select, input[type="text"], textarea { padding: 6px; border: 1px solid #dadce0; border-radius: 5px; font-size: 13px; }
+        textarea { width: 100%; box-sizing: border-box; }
+        button { background: #0073e6; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+        button:hover { background: #005bb5; }
+        button.secondary { background: #5f6368; }
+        button.secondary:hover { background: #3c4043; }
+        .create-wrap { background: white; margin: 0 22px 24px; border-radius: 8px; padding: 18px 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .create-wrap h2 { margin-top: 0; font-size: 17px; }
+        .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .form-row div { flex: 1; min-width: 180px; }
+        .form-row label { font-size: 12px; font-weight: bold; color: #3c4043; display: block; margin-bottom: 4px; }
+        .form-row input, .form-row select { width: 100%; box-sizing: border-box; }
+        details summary { font-size: 13px; }
+        .history-item { margin-bottom: 7px; font-size: 12.5px; }
+        .record-text { background: #fff; border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 8px; margin-top: 3px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">🏃 Handoff <span>— Hospital Dashboard</span></div>
+        <div class="userbox">
+            Signed in as <strong>{{ current_user.name }}</strong> · {{ current_user.role_name }}
+            <a href="{{ url_for('logout') }}">Sign out</a>
+        </div>
+    </div>
+
+    <div class="metrics">
+        <div class="metric"><div class="num">{{ metrics.NEW }}</div><div class="lbl">New</div></div>
+        <div class="metric"><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">In Progress</div></div>
+        <div class="metric alert"><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">Escalated</div></div>
+        <div class="metric"><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">Completed</div></div>
+        <div class="metric alert"><div class="num">{{ metrics.stale }}</div><div class="lbl">Waiting Too Long</div></div>
+        <div class="metric"><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div>
+    </div>
+
+    <div class="board">
+        <div class="column new">
+            <h2>NEW</h2>
+            {% for h in handoffs if h["status"] == "NEW" %}
+                {% include "handoff_card.html" %}
+            {% endfor %}
+        </div>
+        <div class="column in-progress">
+            <h2>IN PROGRESS</h2>
+            {% for h in handoffs if h["status"] == "IN_PROGRESS" %}
+                {% include "handoff_card.html" %}
+            {% endfor %}
+        </div>
+        <div class="column escalated">
+            <h2>ESCALATED</h2>
+            {% for h in handoffs if h["status"] == "ESCALATED" %}
+                {% include "handoff_card.html" %}
+            {% endfor %}
+        </div>
+        <div class="column completed">
+            <h2>COMPLETED</h2>
+            {% for h in handoffs if h["status"] == "COMPLETED" %}
+                {% include "handoff_card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="create-wrap">
+        <h2>Create New Handoff</h2>
+        <form method="POST" action="{{ url_for('create_handoff') }}">
+            <div class="form-row">
+                <div>
+                    <label>Patient Name (Last, Initial)</label>
+                    <input type="text" name="patient_name" placeholder="SMITH, J" required>
+                </div>
+                <div>
+                    <label>Case ID</label>
+                    <input type="text" name="case_id" placeholder="A44219" required>
+                </div>
+                <div>
+                    <label>Event</label>
+                    <input type="text" name="event" placeholder="MRI / Lab / Consult" required>
+                </div>
+                <div>
+                    <label>Pass the baton to (first owner)</label>
+                    <select name="owner" required>
+                        <option value="" disabled selected>-- Select Role --</option>
+                        {% for uid, u in users.items() %}
+                            <option value="{{ uid }}">{{ u.role_name }} — {{ u.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <p style="font-size:12px; color:#5f6368;">You are creating this handoff as <strong>{{ current_user.name }}</strong> ({{ current_user.role_name }}). You are recorded as the initiator.</p>
+            <button type="submit">Create Handoff</button>
+        </form>
+    </div>
+
+<script>
+document.querySelectorAll('.time').forEach(el => {
+    const time = el.getAttribute('data-time');
+    if (time) {
+        const diffMs = new Date() - new Date(time);
+        const diffSeconds = Math.floor(diffMs / 1000);
+        const diffMinutes = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        if (diffSeconds < 60) el.innerText = "just now";
+        else if (diffMinutes < 60) el.innerText = diffMinutes + " min ago";
+        else if (diffHours < 24) el.innerText = diffHours + " hr ago";
+        else el.innerText = diffDays === 1 ? "1 day ago" : diffDays + " days ago";
+    }
+});
+</script>
+</body>
+</html>
