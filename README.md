@@ -354,3 +354,9 @@ Healthcare professional, entrepreneur, and systems thinker focused on patient-ce
 Handoff is being developed from a simple question:
 
 > **When responsibility for patient care changes hands, why shouldn't everyone who needs to know be able to see where the baton is?**
+
+---
+
+## © Copyright & License
+
+Copyright © 2026 Derrick D. Dennis. All rights reserved. See [LICENSE](LICENSE) — viewing this repository does not grant permission to use, copy, or distribute the code, design, or documentation.
