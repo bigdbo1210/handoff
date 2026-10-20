@@ -15,15 +15,17 @@ from datetime import datetime, timedelta, timezone
 
 DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "handoffs.json")
 
-NOW = datetime.now(timezone.utc)
+def build_seed_handoffs():
+    """Return the demo board, with timestamps relative to right now."""
+    NOW = datetime.now(timezone.utc)
 
-def t(minutes_ago):
-    return (NOW - timedelta(minutes=minutes_ago)).isoformat()
+    def t(minutes_ago):
+        return (NOW - timedelta(minutes=minutes_ago)).isoformat()
 
-def hid(minutes_ago, suffix):
-    return (NOW - timedelta(minutes=minutes_ago)).strftime("%Y%m%d%H%M%S") + "-" + suffix
+    def hid(minutes_ago, suffix):
+        return (NOW - timedelta(minutes=minutes_ago)).strftime("%Y%m%d%H%M%S") + "-" + suffix
 
-handoffs = [
+    return [
     # 1) The hero journey: full baton chain, currently with the RN, in progress.
     {
         "handoff_id": hid(187, "a1b2"),
@@ -116,12 +118,16 @@ handoffs = [
             {"at": t(11), "event": "RECORD_ADDED", "type": "NOTE", "text": "Cardiology paged. Echo scheduled after consult.", "by": 7},
         ],
     },
-]
+    ]
 
-os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-with open(DATA_FILE, "w") as f:
-    json.dump(handoffs, f, indent=2)
+def main():
+    handoffs = build_seed_handoffs()
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    with open(DATA_FILE, "w") as f:
+        json.dump(handoffs, f, indent=2)
+    print(f"Seeded {len(handoffs)} demo handoffs -> {DATA_FILE}")
+    for h in handoffs:
+        print(f"  {h['status']:<12} {h['event']:<28} owner={h['owner']}  history={len(h['history'])} events")
 
-print(f"Seeded {len(handoffs)} demo handoffs -> {DATA_FILE}")
-for h in handoffs:
-    print(f"  {h['status']:<12} {h['event']:<28} owner={h['owner']}  history={len(h['history'])} events")
+if __name__ == "__main__":
+    main()

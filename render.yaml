@@ -1,0 +1,17 @@
+# Render blueprint for the Handoff public demo.
+# Demo data is fictional and re-seeds itself on every cold start
+# (HANDOFF_SEED_DEMO=1), because the free plan's filesystem is ephemeral.
+services:
+  - type: web
+    name: handoff-demo
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: HANDOFF_SEED_DEMO
+        value: "1"
+      - key: HANDOFF_DEBUG
+        value: "0"
+      - key: HANDOFF_SECRET_KEY
+        generateValue: true

@@ -122,6 +122,14 @@ def find_handoff(handoffs, handoff_id):
             return h
     return None
 
+# Hosted-demo mode: on hosts with an ephemeral filesystem the data file
+# disappears whenever the service restarts, which would greet visitors
+# with an empty board. When HANDOFF_SEED_DEMO=1, (re)seed the fictional
+# demo board on startup whenever no data exists yet.
+if os.environ.get("HANDOFF_SEED_DEMO") == "1" and not load_handoffs():
+    from seed_demo import build_seed_handoffs
+    save_handoffs(build_seed_handoffs())
+
 # -----------------------------
 # Auth routes
 # -----------------------------
