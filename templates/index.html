@@ -92,6 +92,9 @@
         .history-item { margin-bottom: 7px; font-size: 12.5px; }
         .record-text { background: #f6f9fc; border: 1px solid #e2e9f2; border-radius: 6px; padding: 5px 8px; margin-top: 3px; }
         .time { font-size: 12px; }
+        .imprint { background: #0b1828; color: #9db8dd; text-align: center; padding: 15px 16px 17px; font-size: 12.5px; letter-spacing: 0.4px; margin-top: 4px; }
+        .imprint strong { color: white; }
+        .imprint .sub2 { font-size: 11px; color: #63758c; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase; }
         /* ---------- Create ---------- */
         .create-wrap { background: white; margin: 0 22px 26px; border-radius: 12px; padding: 18px 22px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); }
         .create-wrap h2 { margin-top: 0; font-size: 17px; color: #10233c; }
@@ -197,6 +200,11 @@
             <p style="font-size:12px; color:#63758c;">You are creating this handoff as <strong>{{ current_user.name }}</strong> ({{ current_user.role_name }}). You are recorded as the initiator.</p>
             <button type="submit">Create Handoff</button>
         </form>
+    </div>
+
+    <div class="imprint">
+        Created by <strong>Derrick D. Dennis</strong>
+        <div class="sub2">&copy; 2026 Derrick D. Dennis &middot; All Rights Reserved</div>
     </div>
 
 <script>
