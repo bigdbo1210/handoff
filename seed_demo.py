@@ -128,6 +128,27 @@ def build_seed_handoffs():
             {"at": t(11), "event": "RECORD_ADDED", "type": "NOTE", "text": "Cardiology paged. Echo scheduled after consult.", "by": 7},
         ],
     },
+    # 6) Care coordination beyond the ER: a pediatric care-plan review,
+    #    owned by Erin Priddy — family, therapy team, and nursing in sync.
+    {
+        "handoff_id": hid(64, "k4m9"),
+        "patient_name": "MOORE, T",
+        "age": 7,
+        "sex": "M",
+        "case_id": "F31407",
+        "event": "Care Plan Review — Autism Services",
+        "initiator": 1,
+        "owner": 8,
+        "status": "IN_PROGRESS",
+        "created_at": t(64),
+        "updated_at": t(9),
+        "history": [
+            {"at": t(64), "event": "CREATED", "by": 1},
+            {"at": t(58), "event": "STATUS_CHANGED_TO_IN_PROGRESS", "by": 1},
+            {"at": t(41), "event": "OWNERSHIP_TRANSFERRED", "by": "1 → 8"},
+            {"at": t(9), "event": "RECORD_ADDED", "type": "NOTE", "text": "Weekly care plan reviewed with the therapy team. Family updated — new goals set for the week.", "by": 8},
+        ],
+    },
     ]
 
 def main():

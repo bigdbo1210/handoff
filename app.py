@@ -78,6 +78,7 @@ USERS = {
     "5": _make_user("5", "amorgan", "Alex Morgan", "5"),
     "6": _make_user("6", "jlee", "Jordan Lee", "6"),
     "7": _make_user("7", "tbrooks", "Taylor Brooks", "7"),
+    "8": _make_user("8", "epriddy", "Erin Priddy", "3"),
 }
 
 USERS_BY_USERNAME = {u.username: u for u in USERS.values()}

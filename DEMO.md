@@ -29,6 +29,7 @@ All demo accounts share the password **handoff123**.
 | dcarter     | Dr. Carter      | ED Attending Physician   |
 | dwilliams   | Dr. Williams    | Resident Physician       |
 | njohnson    | Nina Johnson    | Nurse Practitioner (NP)  |
+| epriddy     | Erin Priddy     | Registered Nurse (RN)    |
 | nthompson   | Nurse Thompson  | Charge Nurse             |
 | amorgan     | Alex Morgan     | Unit Clerk               |
 | jlee        | Jordan Lee      | Care Coordinator         |
