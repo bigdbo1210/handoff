@@ -495,20 +495,61 @@ def patient_summaries(handoffs, care, user, meta):
     out.sort(key=lambda p: (p["latest"] or {}).get("at", ""), reverse=True)
     return out
 
-# -----------------------------
-# Screen 1 — My Patients (patient-centered home)
-# -----------------------------
+STATUS_FILTERS = {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "STALE", "COMPLETIONS"}
+FILTER_LABELS = {
+    "NEW": "New",
+    "IN_PROGRESS": "In Progress",
+    "ESCALATED": "Escalated",
+    "COMPLETED": "Completed",
+    "STALE": "Waiting Too Long",
+    "COMPLETIONS": "Completion Times",
+}
 
-@app.route("/")
-@login_required
-def index():
-    handoffs = load_handoffs()
-    care = load_care()
-    meta = user_meta()
-    all_handoffs = [enrich(h) for h in handoffs]
-    metrics = compute_metrics(all_handoffs)
-    summaries = patient_summaries(handoffs, care, current_user, meta)
-    q = (request.args.get("q") or "").strip()
+@app.template_filter("fmt_minutes")
+def fmt_minutes(m):
+    if m is None:
+        return "—"
+    m = int(round(m))
+    if m < 60:
+        return f"{m} min"
+    return f"{m // 60} h {m % 60:02d} min" if m % 60 else f"{m // 60} h"
+
+def completion_stats(tasks):
+    """Completion-time breakdown for completed tasks that carry both a
+    creation and a completion timestamp."""
+    rows = []
+    for h in tasks:
+        if h.get("status") != "COMPLETED":
+            continue
+        created = parse_ts(h.get("created_at"))
+        done_at = None
+        for e in h.get("history", []):
+            if e["event"] == "STATUS_CHANGED_TO_COMPLETED":
+                done_at = parse_ts(e["at"])
+        if created and done_at:
+            rows.append({"task": h, "minutes": (done_at - created).total_seconds() / 60,
+                         "done_at": done_at.isoformat()})
+    durations = sorted(r["minutes"] for r in rows)
+    stats = {"count": len(rows), "rows": rows, "avg": None, "median": None, "min": None, "max": None}
+    if durations:
+        stats["avg"] = round(sum(durations) / len(durations))
+        mid = len(durations) // 2
+        stats["median"] = round(durations[mid] if len(durations) % 2 else (durations[mid - 1] + durations[mid]) / 2)
+        stats["min"] = round(durations[0])
+        stats["max"] = round(durations[-1])
+    return stats
+
+def build_worklist(handoffs, care, user, meta, q="", active_filter=None):
+    """Shared view-model for Screen 1 and its refresh fragment.
+
+    The home-page metric cards describe the signed-in clinician's own
+    authorized universe — so the number on a card always matches what
+    selecting it can show that clinician. (The Operations Board keeps
+    unit-wide numbers.)"""
+    summaries = patient_summaries(handoffs, care, user, meta)
+    authorized_all = [p for p in summaries if p["can_view"]]
+    scoped_tasks = [h for p in authorized_all for h in p["tasks"]]
+    metrics = compute_metrics(scoped_tasks)
     if q:
         needle = q.lower()
         def matches(p):
@@ -521,21 +562,73 @@ def index():
                         fields += [m["name"], m["role"]]
             return any(needle in str(f).lower() for f in fields)
         summaries = [p for p in summaries if matches(p)]
-    my_patients = [p for p in summaries if p["mine"]]
     authorized = [p for p in summaries if p["can_view"]]
-    version = state_version(handoffs, [p["case_id"] for p in authorized], meta)
+    ctx = {
+        "my_patients": [p for p in summaries if p["mine"]],
+        "authorized": authorized,
+        "authorized_all": authorized_all,
+        "metrics": metrics,
+        "active_filter": active_filter if active_filter in STATUS_FILTERS else None,
+        "filter_kind": None,
+        "filter_groups": [],
+        "filter_task_count": 0,
+        "filter_patient_count": 0,
+        "completion": None,
+        "completion_groups": [],
+    }
+    if active_filter == "COMPLETIONS":
+        stats = completion_stats(scoped_tasks)
+        by_patient = {}
+        for row in stats["rows"]:
+            by_patient.setdefault(str(row["task"]["case_id"]), []).append(row)
+        ctx["filter_kind"] = "completions"
+        ctx["completion"] = stats
+        ctx["completion_groups"] = [
+            {"patient": p, "rows": by_patient[p["case_id"]]}
+            for p in authorized_all if p["case_id"] in by_patient
+        ]
+    elif active_filter in STATUS_FILTERS:
+        def task_matches(h):
+            if active_filter == "STALE":
+                return bool(h.get("stale_level"))
+            return h.get("status") == active_filter
+        total = 0
+        for p in authorized_all:
+            ms = [h for h in p["tasks"] if task_matches(h)]
+            if ms:
+                ctx["filter_groups"].append(
+                    {"patient": p, "tasks": ms, "section": task_section(ms[0])})
+                total += len(ms)
+        ctx["filter_kind"] = "status"
+        ctx["filter_task_count"] = total
+        ctx["filter_patient_count"] = len(ctx["filter_groups"])
+    return ctx
+
+# -----------------------------
+# Screen 1 — My Patients (patient-centered home)
+# -----------------------------
+
+@app.route("/")
+@login_required
+def index():
+    handoffs = load_handoffs()
+    care = load_care()
+    meta = user_meta()
+    q = (request.args.get("q") or "").strip()
+    active_filter = (request.args.get("filter") or "").upper() or None
+    ctx = build_worklist(handoffs, care, current_user, meta, q=q, active_filter=active_filter)
+    version = state_version(handoffs, [p["case_id"] for p in ctx["authorized_all"]], meta)
     return render_template(
         "index.html",
-        my_patients=my_patients,
-        authorized=authorized,
+        **ctx,
         roles=display_roles(),
         users=USERS,
-        metrics=metrics,
         user_meta=meta,
         q=q,
         total_count=len(all_patients(handoffs)),
         state_version=version,
         section_labels=SECTION_LABELS,
+        filter_labels=FILTER_LABELS,
     )
 
 @app.route("/fragments/worklist")
@@ -544,18 +637,17 @@ def fragment_worklist():
     handoffs = load_handoffs()
     care = load_care()
     meta = user_meta()
-    summaries = patient_summaries(handoffs, care, current_user, meta)
-    my_patients = [p for p in summaries if p["mine"]]
-    authorized = [p for p in summaries if p["can_view"]]
+    active_filter = (request.args.get("filter") or "").upper() or None
+    ctx = build_worklist(handoffs, care, current_user, meta, q="", active_filter=active_filter)
     return render_template(
         "worklist_blocks.html",
-        my_patients=my_patients,
-        authorized=authorized,
+        **ctx,
         roles=display_roles(),
         users=USERS,
         user_meta=meta,
         q="",
         section_labels=SECTION_LABELS,
+        filter_labels=FILTER_LABELS,
     )
 
 # -----------------------------

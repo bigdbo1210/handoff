@@ -30,7 +30,17 @@
         .userchip a { color: #7db4ff; font-size: 12.5px; text-decoration: none; margin-left: 6px; }
         .flash-wrap { margin: 12px 22px 0; }
         .flash { background: #fff8e1; border: 1px solid #f3d27a; color: #6d5200; border-radius: 8px; padding: 9px 14px; font-size: 13px; }
-        .metrics { display: flex; gap: 14px; padding: 18px 22px 4px; flex-wrap: wrap; }
+        .metrics { display: flex; gap: 14px; padding: 2px 0 4px; flex-wrap: wrap; }
+        a.metric { text-decoration: none; color: inherit; cursor: pointer; }
+        a.metric:hover { box-shadow: 0 3px 12px rgba(23,78,166,0.22); }
+        a.metric.active { outline: 3px solid #1a73e8; outline-offset: 1px; }
+        .metrics-note { font-size: 11.5px; color: #63758c; margin: 6px 2px 14px; }
+        .stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .stat-tile { background: white; border-radius: 12px; padding: 13px 17px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); flex: 1 1 140px; }
+        .stat-num { font-size: 22px; font-weight: 800; color: #10233c; }
+        .stat-lbl { font-size: 11px; color: #63758c; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; font-weight: bold; }
+        .done-row { display: flex; justify-content: space-between; gap: 12px; border: 1px solid #e2e9f2; border-radius: 8px; padding: 9px 13px; margin-top: 9px; font-size: 13px; flex-wrap: wrap; }
+        .done-meta { color: #63758c; font-size: 12px; }
         .metric { background: white; border-radius: 12px; padding: 14px 18px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); flex: 1 1 150px; display: flex; align-items: center; justify-content: space-between; }
         .metric .num { font-size: 27px; font-weight: 800; color: #10233c; }
         .metric .lbl { font-size: 11px; color: #63758c; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; font-weight: bold; }
@@ -140,7 +150,8 @@
         .form-row input, .form-row select { width: 100%; }
         @media (max-width: 900px) {
             .metrics { padding: 12px 14px 0; gap: 10px; }
-            .metric { flex: 1 1 42%; padding: 10px 14px; }
+            .metric { flex: 1 1 42%; padding: 10px 12px; }
+            .metric .icon { width: 30px; height: 30px; margin-left: 6px; }
             .metric .num { font-size: 22px; }
             .topbar { flex-wrap: wrap; padding: 12px 14px; }
             .searchbox { order: 3; flex-basis: 100%; max-width: none; }
@@ -150,6 +161,12 @@
             .auth-latest { display: none; }
             button { padding: 9px 14px; }
             select, input[type="text"], textarea { font-size: 16px; }
+        }
+        @media (max-width: 520px) {
+            .metrics { gap: 8px; }
+            .metric .num { font-size: 19px; }
+            .metric .lbl { font-size: 10px; }
+            .metrics-note { margin-bottom: 10px; }
         }
     </style>
 </head>
@@ -175,15 +192,6 @@
     <div class="flash-wrap">{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}</div>
     {% endif %}
     {% endwith %}
-
-    <div class="metrics">
-        <div class="metric"><div><div class="num">{{ metrics.NEW }}</div><div class="lbl">NEW</div></div><div class="icon amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b06000" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div></div>
-        <div class="metric"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">IN PROGRESS</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></div>
-        <div class="metric alert"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">ESCALATED</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></div>
-        <div class="metric"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">COMPLETED</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></div>
-        <div class="metric{% if metrics.stale %} alert{% endif %}"><div><div class="num">{{ metrics.stale }}</div><div class="lbl">Waiting Too Long</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></div>
-        <div class="metric"><div><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></div>
-    </div>
 
     {% if q %}
     <div class="search-note">Showing patients matching &ldquo;{{ q }}&rdquo;. <a href="{{ url_for('index') }}">Clear search</a></div>
@@ -279,6 +287,7 @@ formatTimes();
 /* --- Safe automatic updates: poll a version stamp; swap only the patient
        blocks, and NEVER while a form holds unsaved work. --- */
 let pageVersion = "{{ state_version }}";
+const ACTIVE_FILTER = "{{ active_filter or '' }}";
 let formDirty = false;
 document.addEventListener('input', e => {
     if (e.target.closest && e.target.closest('form')) formDirty = true;
@@ -290,7 +299,7 @@ function editingNow() {
 }
 async function refreshBlocks() {
     try {
-        const r = await fetch("{{ url_for('fragment_worklist') }}");
+        const r = await fetch("{{ url_for('fragment_worklist') }}" + (ACTIVE_FILTER ? "?filter=" + ACTIVE_FILTER : ""));
         if (!r.ok) return;
         document.getElementById('worklist-wrap').innerHTML = await r.text();
         formatTimes();

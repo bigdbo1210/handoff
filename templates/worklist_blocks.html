@@ -1,4 +1,84 @@
-{# Patient blocks for Screen 1 — shared by the homepage and the refresh fragment. #}
+{# Screen 1 content — shared by the homepage and the refresh fragment.
+   The metric cards lead: they count the signed-in clinician's authorized
+   universe, and selecting one filters this list (grouped by patient). #}
+<div class="metrics">
+    <a class="metric{% if active_filter == 'NEW' %} active{% endif %}" href="{{ url_for('index', filter='NEW') }}"><div><div class="num">{{ metrics.NEW }}</div><div class="lbl">NEW</div></div><div class="icon amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b06000" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div></a>
+    <a class="metric{% if active_filter == 'IN_PROGRESS' %} active{% endif %}" href="{{ url_for('index', filter='IN_PROGRESS') }}"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">IN PROGRESS</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></a>
+    <a class="metric alert{% if active_filter == 'ESCALATED' %} active{% endif %}" href="{{ url_for('index', filter='ESCALATED') }}"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">ESCALATED</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></a>
+    <a class="metric{% if active_filter == 'COMPLETED' %} active{% endif %}" href="{{ url_for('index', filter='COMPLETED') }}"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">COMPLETED</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></a>
+    <a class="metric{% if metrics.stale %} alert{% endif %}{% if active_filter == 'STALE' %} active{% endif %}" href="{{ url_for('index', filter='STALE') }}"><div><div class="num">{{ metrics.stale }}</div><div class="lbl">Waiting Too Long</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></a>
+    <a class="metric{% if active_filter == 'COMPLETIONS' %} active{% endif %}" href="{{ url_for('index', filter='COMPLETIONS') }}"><div><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></a>
+</div>
+<p class="metrics-note">Counts cover the patients you are authorized for. Select a card to filter this page; counts are <strong>tasks</strong>, grouped by patient.</p>
+
+{% if filter_kind == "status" %}
+<div class="section-head">
+    <h2>{{ filter_labels[active_filter] }}</h2>
+    <span class="section-sub"><strong>{{ filter_task_count }} task{{ "s" if filter_task_count != 1 }}</strong> across <strong>{{ filter_patient_count }} patient{{ "s" if filter_patient_count != 1 }}</strong> — your authorized patients only. <a href="{{ url_for('index') }}">Clear filter ✕</a></span>
+</div>
+{% if filter_groups %}
+<div class="patient-blocks">
+    {% for g in filter_groups %}
+    {% set p = g.patient %}
+    <div class="patient-block" data-case="{{ p.case_id }}">
+        <div class="patient-head">
+            <div class="patient-id">
+                {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
+                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">{{ p.patient_name }}</a>
+                <span class="patient-meta">Case: {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
+            </div>
+            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">Open Patient →</a>
+        </div>
+        <div class="block-cards">
+            {% for h in g.tasks %}
+                {% include "handoff_card.html" %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-block">No {{ filter_labels[active_filter]|lower }} tasks among your authorized patients right now.</div>
+{% endif %}
+
+{% elif filter_kind == "completions" %}
+<div class="section-head">
+    <h2>Completion Times</h2>
+    <span class="section-sub">How long handoffs take, from creation to completion — your authorized patients only. <a href="{{ url_for('index') }}">Clear ✕</a></span>
+</div>
+{% if completion and completion.count %}
+<div class="stats-row">
+    <div class="stat-tile"><div class="stat-num">{{ completion.avg|fmt_minutes }}</div><div class="stat-lbl">Average</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.median|fmt_minutes }}</div><div class="stat-lbl">Median</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.min|fmt_minutes }}</div><div class="stat-lbl">Fastest</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.max|fmt_minutes }}</div><div class="stat-lbl">Slowest</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.count }}</div><div class="stat-lbl">Completed tasks counted</div></div>
+</div>
+<div class="patient-blocks">
+    {% for g in completion_groups %}
+    {% set p = g.patient %}
+    <div class="patient-block" data-case="{{ p.case_id }}">
+        <div class="patient-head">
+            <div class="patient-id">
+                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section='HISTORY') }}">{{ p.patient_name }}</a>
+                <span class="patient-meta">Case: {{ p.case_id }}{% if p.context %} · {{ p.context }}{% endif %}</span>
+            </div>
+            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section='HISTORY') }}">Open Patient →</a>
+        </div>
+        {% for row in g.rows %}
+        <div class="done-row">
+            <span class="done-main"><strong>{{ row.task.event }}</strong></span>
+            <span class="done-meta">took <strong>{{ row.minutes|fmt_minutes }}</strong> · completed <span class="time" data-time="{{ row.done_at }}">just now</span></span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-block">No completed tasks with full timestamps among your authorized patients yet — the breakdown appears as handoffs complete.</div>
+{% endif %}
+
+{% else %}
 <div class="section-head">
     <h2>My Patients</h2>
     <span class="section-sub">The patients you follow or hold an open baton for — latest activity first.</span>
@@ -64,3 +144,4 @@
     <div class="empty-block">No authorized patients.</div>
     {% endfor %}
 </div>
+{% endif %}
