@@ -1,0 +1,66 @@
+{# Patient blocks for Screen 1 — shared by the homepage and the refresh fragment. #}
+<div class="section-head">
+    <h2>My Patients</h2>
+    <span class="section-sub">The patients you follow or hold an open baton for — latest activity first.</span>
+</div>
+{% if my_patients %}
+<div class="patient-blocks">
+    {% for p in my_patients %}
+    <div class="patient-block" data-case="{{ p.case_id }}">
+        <div class="patient-head">
+            <div class="patient-id">
+                {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
+                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section if p.latest else 'TASKS') }}">{{ p.patient_name }}</a>
+                <span class="patient-meta">Case: {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
+            </div>
+            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id) }}">Open Patient →</a>
+        </div>
+        {% if p.latest %}
+        <a class="latest-line" href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section) }}">
+            <span class="latest-text">{{ p.latest.line }}</span>
+            <span class="latest-time time" data-time="{{ p.latest.at }}">just now</span>
+        </a>
+        {% endif %}
+        <div class="strip-chips">
+            {% for sec in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
+            <a class="strip-chip" href="{{ url_for('patient_page', case_id=p.case_id, section=sec) }}">
+                <span class="strip-chip-k">{{ section_labels[sec] }}</span>
+                <span class="strip-chip-v">{{ p.strip[sec] if p.strip[sec] else "No updates recorded" }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% if p.open_tasks %}
+        <div class="block-cards">
+            {% for h in p.open_tasks %}
+                {% include "handoff_card.html" %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="no-open">No open tasks for this patient — all caught up.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-block">No patients on your list yet. Patients appear here when you follow them, create a handoff, or receive a baton.</div>
+{% endif %}
+
+<div class="section-head" style="margin-top: 26px;">
+    <h2>All Authorized Patients</h2>
+    <span class="section-sub">Every patient whose care team you are on. <a href="{{ url_for('board') }}">Operations board (by status) →</a></span>
+</div>
+<div class="auth-list">
+    {% for p in authorized %}
+    <a class="auth-row" href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section if p.latest else 'TASKS') }}">
+        <span class="auth-main">
+            {% if p.unread %}<span class="unread-dot"></span>{% endif %}
+            <span class="auth-name">{{ p.patient_name }}</span>
+            <span class="auth-meta">Case: {{ p.case_id }}{% if p.context %} · {{ p.context }}{% endif %}</span>
+        </span>
+        <span class="auth-latest">{{ p.latest.line if p.latest else "" }}</span>
+        <span class="auth-open">Open →</span>
+    </a>
+    {% else %}
+    <div class="empty-block">No authorized patients.</div>
+    {% endfor %}
+</div>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Handoff — {{ p.patient_name }} (Case {{ p.case_id }})</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(180deg, #eef3f9 0%, #e6edf5 100%); margin: 0; padding: 0; color: #16283f; min-height: 100vh; }
+        .topbar { background: linear-gradient(90deg, #0b1828 0%, #10233c 60%, #14304f 100%); color: white; padding: 12px 22px; display: flex; align-items: center; gap: 18px; box-shadow: 0 2px 10px rgba(11,24,40,0.35); }
+        .brand { display: flex; align-items: center; white-space: nowrap; }
+        .brandmark-sm { width: 27px; height: 27px; margin-right: 9px; }
+        .wordmark-sm { font-weight: 800; letter-spacing: 2.5px; font-size: 19px; }
+        .brand-sub { color: #7db4ff; font-size: 12px; letter-spacing: 2.2px; text-transform: uppercase; margin-left: 12px; font-weight: bold; }
+        .searchbox { flex: 1; max-width: 520px; margin: 0 auto; }
+        .searchbox input { width: 100%; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: white; border-radius: 20px; padding: 8px 16px; font-size: 13.5px; outline: none; }
+        .searchbox input::placeholder { color: #9db8dd; }
+        .userchip { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; color: white; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex: none; }
+        .userchip .who { line-height: 1.25; }
+        .userchip .who .n { font-size: 13px; font-weight: bold; }
+        .userchip .who .r { font-size: 11px; color: #9db8dd; }
+        .userchip a { color: #7db4ff; font-size: 12.5px; text-decoration: none; margin-left: 6px; }
+        .flash-wrap { margin: 12px 22px 0; }
+        .flash { background: #fff8e1; border: 1px solid #f3d27a; color: #6d5200; border-radius: 8px; padding: 9px 14px; font-size: 13px; }
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 16px 22px 26px; }
+        .backlink { font-size: 13px; font-weight: bold; color: #174ea6; text-decoration: none; }
+        .backlink:hover { text-decoration: underline; }
+        .p-head { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); margin-top: 12px; }
+        .p-title-row { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+        .p-title { flex: 1; min-width: 240px; }
+        .p-name { font-size: 23px; font-weight: 800; color: #10233c; }
+        .p-meta { font-size: 13px; color: #63758c; margin-top: 4px; }
+        .follow-form button { background: #5f7086; }
+        .follow-form button.following { background: #e8f0fe; color: #174ea6; border: 1px solid #7db4ff; }
+        .strip { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .strip-cell { flex: 1 1 200px; border: 1px solid #e2e9f2; border-radius: 8px; padding: 9px 12px; text-decoration: none; background: #fbfcfe; }
+        .strip-cell:hover { border-color: #7db4ff; }
+        .strip-k { display: block; font-size: 10.5px; font-weight: bold; letter-spacing: 0.7px; text-transform: uppercase; color: #63758c; }
+        .strip-v { display: block; font-size: 13px; color: #22344c; margin-top: 3px; }
+        .team { margin-top: 16px; border-top: 1px solid #eef1f4; padding-top: 13px; }
+        .team-title { font-size: 11px; font-weight: bold; letter-spacing: 0.8px; text-transform: uppercase; color: #63758c; margin-bottom: 9px; }
+        .team-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .member-chip { display: inline-flex; align-items: center; gap: 7px; background: #f6f9fc; border: 1px solid #e2e9f2; border-radius: 16px; padding: 4px 11px 4px 5px; font-size: 12.5px; }
+        .member-chip .avatar { width: 24px; height: 24px; font-size: 10px; }
+        .member-chip .m-role { color: #63758c; font-size: 11px; }
+        .member-chip form { display: inline; }
+        .member-chip button { background: none; color: #a50e0e; padding: 0 2px; font-size: 13px; }
+        .member-chip button:hover { background: none; text-decoration: underline; }
+        .team-add { display: inline-flex; gap: 7px; align-items: center; margin-left: 6px; }
+        .actions { margin-top: 14px; }
+        .actions summary { font-size: 13px; font-weight: bold; color: #174ea6; cursor: pointer; }
+        .actions-body { margin-top: 9px; font-size: 13px; color: #3c4a5c; display: grid; gap: 8px; }
+        .actions-body form { display: inline; }
+        .actions-body button.linky { background: none; color: #a50e0e; padding: 0; font-size: 13px; }
+        .actions-body button.linky:hover { background: none; text-decoration: underline; }
+        .checklist-note { margin-top: 14px; background: #eef4ff; border: 1px solid #bcd6ff; color: #174ea6; border-radius: 8px; padding: 9px 13px; font-size: 12.5px; }
+        .tabs { display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
+        .tab { font-size: 13px; font-weight: bold; color: #3c4a5c; text-decoration: none; background: white; border: 1px solid #e2e9f2; border-bottom: none; border-radius: 9px 9px 0 0; padding: 9px 15px; }
+        .tab.active { background: #10233c; color: white; border-color: #10233c; }
+        .tab-count { background: #d93025; color: white; font-size: 10.5px; border-radius: 9px; padding: 1px 7px; margin-left: 5px; }
+        .pane { background: white; border-radius: 0 12px 12px 12px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); padding: 18px 20px; }
+        .pane-title { margin: 0 0 12px; font-size: 16px; color: #10233c; }
+        .pane-subtitle { margin: 18px 0 8px; font-size: 13.5px; color: #10233c; }
+        .pane-note { font-size: 12.5px; color: #63758c; margin: -4px 0 14px; }
+        .pane-empty { font-size: 13.5px; color: #63758c; }
+        .rec-entry { border: 1px solid #e2e9f2; border-radius: 8px; padding: 10px 13px; margin-bottom: 9px; background: #fbfcfe; }
+        .rec-text { font-size: 14px; color: #22344c; }
+        .rec-meta { font-size: 11.5px; color: #63758c; margin-top: 5px; }
+        .task-line { display: flex; justify-content: space-between; gap: 12px; border: 1px solid #e2e9f2; border-radius: 8px; padding: 9px 13px; margin-bottom: 8px; font-size: 13px; flex-wrap: wrap; }
+        .task-line-owner { color: #63758c; font-size: 12px; }
+        .ack-wait { color: #9a6a00; font-weight: bold; }
+        .ack-ok { color: #137333; font-weight: bold; }
+        .hist-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid #eef1f4; font-size: 13px; flex-wrap: wrap; }
+        .hist-row:last-child { border-bottom: none; }
+        .hist-meta { color: #63758c; font-size: 12px; white-space: nowrap; }
+        .block-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+        /* --- cards (shared partial) --- */
+        .card { background: #ffffff; border: 1px solid #e2e9f2; padding: 13px 14px; border-radius: 10px; box-shadow: 0 1px 4px rgba(16,42,74,0.07); }
+        .card.stale-amber { border-left: 5px solid #f9ab00; }
+        .card.stale-red { border-left: 5px solid #d93025; background: #fffafa; }
+        .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .card-title { font-size: 14.5px; font-weight: bold; color: #10233c; }
+        .card-dots { color: #a7b3c2; font-size: 13px; letter-spacing: 1px; }
+        .card-case { font-size: 12px; color: #63758c; margin-top: 2px; }
+        .card-patient { font-size: 12.5px; color: #3c4a5c; margin-top: 3px; letter-spacing: 0.3px; }
+        .card-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        .sec-chip { font-size: 10.5px; font-weight: bold; letter-spacing: 0.6px; text-transform: uppercase; background: #eef1f4; color: #3c4a5c; border-radius: 10px; padding: 2px 9px; }
+        .ack-chip { font-size: 10.5px; font-weight: bold; background: #fef7e0; color: #9a6a00; border-radius: 10px; padding: 2px 9px; }
+        .canceled-chip { font-size: 10.5px; font-weight: bold; background: #f1f3f4; color: #48586c; border-radius: 10px; padding: 2px 9px; }
+        .card-meta { margin-top: 9px; }
+        .pill { display: inline-block; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 11px; background: #e8f0fe; color: #174ea6; }
+        .pill.amber { background: #fef7e0; color: #9a6a00; }
+        .pill.red { background: #fce8e6; color: #a50e0e; }
+        .pill.done { background: #e6f4ea; color: #137333; }
+        .owner-row { display: flex; align-items: center; gap: 9px; margin-top: 11px; }
+        .owner-row .avatar { width: 30px; height: 30px; font-size: 11px; }
+        .owner-name { font-size: 12.5px; font-weight: bold; color: #22344c; }
+        .owner-role { font-size: 11px; color: #63758c; }
+        .initiator-line { font-size: 11px; color: #8a97a8; margin-top: 7px; }
+        .ack-line { font-size: 11.5px; margin-top: 8px; }
+        .owner-note { font-size: 12px; color: #63758c; margin: 10px 0 0; }
+        .action-form { margin-top: 10px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .action-form label { font-size: 12px; font-weight: bold; color: #3c4a5c; }
+        .action-form select { flex: 1; min-width: 120px; }
+        .ack-hint { font-size: 11.5px; color: #63758c; }
+        .cancel-wrap { margin-top: 12px; font-size: 12.5px; }
+        .cancel-wrap summary { cursor: pointer; font-weight: bold; color: #a50e0e; }
+        .cancel-form { margin-top: 8px; display: grid; gap: 7px; }
+        .cancel-form label { font-size: 12px; font-weight: bold; color: #3c4a5c; }
+        .note-form { margin-top: 12px; border-top: 1px dashed #e2e9f2; padding-top: 10px; }
+        .note-form label { font-size: 12px; font-weight: bold; color: #3c4a5c; display: block; margin-bottom: 5px; }
+        .note-row { margin-top: 6px; display: flex; gap: 7px; flex-wrap: wrap; }
+        select, input[type="text"], textarea { padding: 6px 8px; border: 1px solid #ccd6e2; border-radius: 6px; font-size: 13px; background: white; }
+        textarea { width: 100%; }
+        button { background: #1a73e8; color: white; border: none; padding: 7px 13px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        button:hover { background: #1765cc; }
+        button.secondary { background: #5f7086; }
+        button.secondary:hover { background: #48586c; }
+        button.danger { background: #a50e0e; }
+        button.danger:hover { background: #7f0b0b; }
+        details.history { margin-top: 12px; }
+        details.history summary { font-size: 12.5px; cursor: pointer; font-weight: bold; color: #174ea6; }
+        .history-body { margin-top: 8px; }
+        .history-item { margin-bottom: 7px; font-size: 12.5px; }
+        .record-text { background: #f6f9fc; border: 1px solid #e2e9f2; border-radius: 6px; padding: 5px 8px; margin-top: 3px; }
+        .rec-cat { font-size: 10.5px; font-weight: bold; background: #e8f0fe; color: #174ea6; border-radius: 9px; padding: 1px 8px; margin-left: 6px; }
+        .time { font-size: 12px; }
+        #updates-pill { display: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; background: #10233c; color: white; border: none; border-radius: 22px; padding: 11px 22px; font-size: 13.5px; box-shadow: 0 6px 20px rgba(11,24,40,0.4); z-index: 50; cursor: pointer; }
+        .imprint { background: #0b1828; color: #9db8dd; text-align: center; padding: 15px 16px 17px; font-size: 12.5px; letter-spacing: 0.4px; margin-top: 26px; }
+        .imprint strong { color: white; }
+        .imprint .sub2 { font-size: 11px; color: #63758c; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase; }
+        @media (max-width: 900px) {
+            .topbar { flex-wrap: wrap; padding: 12px 14px; }
+            .searchbox { order: 3; flex-basis: 100%; max-width: none; }
+            .wrap { padding: 14px; }
+            .flash-wrap { margin: 12px 14px 0; }
+            button { padding: 9px 14px; }
+            select, input[type="text"], textarea { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand"><svg class="brandmark-sm" viewBox="0 0 48 48" aria-label="Handoff logo"><path d="M9 32 Q24 8 39 16" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/><circle cx="9" cy="32" r="5" fill="none" stroke="#ffffff" stroke-width="3.5"/><circle cx="24" cy="15.6" r="3" fill="#7db4ff"/><circle cx="39" cy="16" r="5.5" fill="#7db4ff"/></svg><span class="wordmark-sm">HANDOFF</span><span class="brand-sub">Care Coordination</span></div>
+        <form class="searchbox" method="GET" action="{{ url_for('index') }}">
+            <input type="text" name="q" placeholder="Search patients, cases, or team members..." aria-label="Search patients">
+        </form>
+        {% set cm = user_meta.get(current_user.id) %}
+        <div class="userchip">
+            <div class="avatar" style="background: {{ cm.color if cm else '#5f6368' }}">{{ cm.initials if cm else '?' }}</div>
+            <div class="who"><div class="n">{{ current_user.name }}</div><div class="r">{{ current_user.role_name }}</div></div>
+            <a href="{{ url_for('board') }}">Operations Board</a>
+            <a href="{{ url_for('logout') }}">Sign out</a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="flash-wrap">{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}</div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="wrap">
+        <a class="backlink" href="{{ url_for('index') }}">‹ My Patients</a>
+
+        <div class="p-head">
+            <div class="p-title-row">
+                <div class="p-title">
+                    <div class="p-name">{{ p.patient_name }}</div>
+                    <div class="p-meta">Case {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %} · {{ p.open_tasks|length }} open task{{ "s" if p.open_tasks|length != 1 }}</div>
+                </div>
+                {% if p.is_following %}
+                <form class="follow-form" method="POST" action="{{ url_for('unfollow_patient') }}">
+                    <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                    <input type="hidden" name="next" value="{{ url_for('patient_page', case_id=p.case_id, section=active_section) }}">
+                    <button class="following" type="submit">✓ On My Patients — Stop Following</button>
+                </form>
+                {% else %}
+                <form class="follow-form" method="POST" action="{{ url_for('follow_patient') }}">
+                    <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                    <input type="hidden" name="next" value="{{ url_for('patient_page', case_id=p.case_id, section=active_section) }}">
+                    <button type="submit">+ Add to My Patients</button>
+                </form>
+                {% endif %}
+            </div>
+
+            <div class="strip">
+                {% for sec in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
+                <a class="strip-cell" href="{{ url_for('patient_page', case_id=p.case_id, section=sec) }}">
+                    <span class="strip-k">{{ section_labels[sec] }} — latest</span>
+                    <span class="strip-v">{{ p.strip[sec] if p.strip[sec] else "No updates recorded" }}</span>
+                </a>
+                {% endfor %}
+            </div>
+
+            <div class="team">
+                <div class="team-title">Care Team</div>
+                <div class="team-chips">
+                    {% for m in p.members %}
+                    <span class="member-chip">
+                        <span class="avatar" style="background: {{ m.color }}">{{ m.initials }}</span>
+                        <span>{{ m.name }} <span class="m-role">· {{ m.role }}</span></span>
+                        {% if p.can_manage_team or m.id == current_user.id %}
+                        <form method="POST" action="{{ url_for('team_remove') }}">
+                            <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                            <input type="hidden" name="user_id" value="{{ m.id }}">
+                            <button type="submit" title="Remove from care team" aria-label="Remove {{ m.name }}">✕</button>
+                        </form>
+                        {% endif %}
+                    </span>
+                    {% endfor %}
+                    <form class="team-add" method="POST" action="{{ url_for('team_add') }}">
+                        <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                        <select name="user_id" required>
+                            <option value="" disabled selected>Add clinician…</option>
+                            {% for uid, u in users.items() %}
+                            <option value="{{ uid }}">{{ u.role_name }} — {{ u.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="secondary">Add to Team</button>
+                    </form>
+                </div>
+            </div>
+
+            <details class="actions">
+                <summary>Patient actions</summary>
+                <div class="actions-body">
+                    <div><strong>Stop Following</strong> — use the button above. It changes only your personal list; the record and the team are untouched. It's blocked while you own an open task here.</div>
+                    <div><strong>Leave Care Team</strong> —
+                        <form method="POST" action="{{ url_for('team_remove') }}">
+                            <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                            <input type="hidden" name="user_id" value="{{ current_user.id }}">
+                            <button class="linky" type="submit">leave this patient's team</button>
+                        </form>
+                        (blocked while you own an open task).
+                    </div>
+                    <div><strong>Transfer Task Responsibility</strong> — on each task card under Pending Tasks ("Pass the baton to"). The baton changes accountability, never anyone's permission to participate.</div>
+                    <div><strong>Cancel a Handoff</strong> — on each open task card. The owner, a charge nurse, or a care coordinator can cancel, and a reason is always recorded.</div>
+                    <div><strong>Close Episode</strong> — when every task for this patient is Completed or Canceled, the episode is closed; the full history stays on this page.</div>
+                </div>
+            </details>
+
+            <div class="checklist-note">Implementation checklist — automatic updates: this page checks for new activity every 20 seconds. Updates never reload over unsaved writing: if you're mid-note, a notice appears and nothing refreshes until you tap it. Every entry here was recorded manually by a named clinician; Handoff has no EMR feed.</div>
+        </div>
+
+        <div id="patient-main">
+            {% include "patient_sections.html" %}
+        </div>
+    </div>
+
+    <button id="updates-pill" type="button">New updates for this patient — tap to refresh</button>
+
+    <div class="imprint">
+        Created by <strong>Derrick D. Dennis</strong>
+        <div class="sub2">&copy; 2026 Derrick D. Dennis &middot; All Rights Reserved</div>
+    </div>
+
+<script>
+function formatTimes() {
+    document.querySelectorAll('.time').forEach(el => {
+        const time = el.getAttribute('data-time');
+        if (time) {
+            const diffMs = new Date() - new Date(time);
+            const diffSeconds = Math.floor(diffMs / 1000);
+            const diffMinutes = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            if (diffSeconds < 60) el.innerText = "just now";
+            else if (diffMinutes < 60) el.innerText = diffMinutes + " min ago";
+            else if (diffHours < 24) el.innerText = diffHours + " hr ago";
+            else el.innerText = diffDays === 1 ? "1 day ago" : diffDays + " days ago";
+        }
+    });
+}
+formatTimes();
+
+/* --- Safe automatic updates on the patient page: a version change never
+       reloads the page on its own — it raises the notice, and the refresh
+       (which preserves the open section and the scroll position) happens
+       only on tap. Unsaved writing is therefore never interrupted. --- */
+let pageVersion = "{{ state_version }}";
+const pill = document.getElementById('updates-pill');
+async function poll() {
+    try {
+        const s = await (await fetch("{{ url_for('api_state') }}")).json();
+        if (s.version !== pageVersion) pill.style.display = 'block';
+    } catch (e) { /* silent retry */ }
+}
+pill.addEventListener('click', () => {
+    sessionStorage.setItem('handoff-scroll', String(window.scrollY));
+    location.reload();
+});
+const savedScroll = sessionStorage.getItem('handoff-scroll');
+if (savedScroll) { window.scrollTo(0, parseInt(savedScroll, 10)); sessionStorage.removeItem('handoff-scroll'); }
+setInterval(poll, 20000);
+</script>
+</body>
+</html>

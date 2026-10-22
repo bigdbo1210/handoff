@@ -1,0 +1,67 @@
+{# Tab bar + section panes for Screen 2 — shared by the patient page and the refresh fragment. #}
+{% set tab_labels = {"LABS": "Labs", "DIAGNOSTICS": "Diagnostics / Imaging", "CONSULTS": "Consultations", "TASKS": "Pending Tasks", "HISTORY": "Accountability History"} %}
+<div class="tabs" role="tablist">
+    {% for sec in ["LABS", "DIAGNOSTICS", "CONSULTS", "TASKS", "HISTORY"] %}
+    <a class="tab{% if active_section == sec %} active{% endif %}" href="{{ url_for('patient_page', case_id=p.case_id, section=sec) }}">{{ tab_labels[sec] }}
+        {% if sec == "TASKS" and p.open_tasks %}<span class="tab-count">{{ p.open_tasks|length }}</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+
+<div class="pane">
+{% if active_section in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
+    {% set data = p.sections_data[active_section] %}
+    <h3 class="pane-title">{{ section_labels[active_section] }}</h3>
+    {% if data.records or data.tasks %}
+        {% for item in data.records|reverse %}
+        <div class="rec-entry">
+            <div class="rec-text">{{ item.text }}</div>
+            <div class="rec-meta">Recorded by {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span> · Entered manually</div>
+        </div>
+        {% endfor %}
+        {% for h in data.tasks %}
+        <div class="task-line">
+            <span class="task-line-main"><strong>{{ h.event }}</strong> — {{ h.status.replace("_", " ").title() }}</span>
+            <span class="task-line-owner">Baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}{% if not h.get('acknowledged_at') and h.status not in ("COMPLETED", "CANCELED") %} · <span class="ack-wait">awaiting acknowledgment</span>{% endif %}</span>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="pane-empty">No {{ section_labels[active_section]|lower }} updates recorded for this patient yet. When one is recorded, it will appear here under the name of the clinician who recorded it.</p>
+    {% endif %}
+
+{% elif active_section == "TASKS" %}
+    <h3 class="pane-title">Pending Tasks</h3>
+    <p class="pane-note">The baton decides accountability for each task. <strong>Holding the baton</strong> means the task is yours; <strong>acknowledgment</strong> means you have confirmed you received it. A task can be assigned to you before you have acknowledged it — both facts are shown on every card.</p>
+    {% if p.open_tasks %}
+    <div class="block-cards">
+        {% for h in p.open_tasks %}
+            {% include "handoff_card.html" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="pane-empty">No open tasks for this patient right now.</p>
+    {% endif %}
+    {% set closed = p.tasks|selectattr("status", "in", ["COMPLETED", "CANCELED"])|list %}
+    {% if closed %}
+    <h4 class="pane-subtitle">Closed tasks</h4>
+    {% for h in closed %}
+    <div class="task-line">
+        <span class="task-line-main"><strong>{{ h.event }}</strong> — {{ h.status.replace("_", " ").title() }}</span>
+        <span class="task-line-owner">Last baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+{% elif active_section == "HISTORY" %}
+    <h3 class="pane-title">Handoff Accountability History</h3>
+    <p class="pane-note">Every baton movement, status change, acknowledgment, and cancellation for this patient — in order, with who did it. Passing the baton changes accountability for a task; it never removes anyone's ability to see or contribute to this patient's record.</p>
+    {% for item in p.accountability|reverse %}
+    <div class="hist-row">
+        <span class="hist-line">{{ item.line }}</span>
+        <span class="hist-meta">{{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "" }} · <span class="time" data-time="{{ item.at }}">just now</span></span>
+    </div>
+    {% else %}
+    <p class="pane-empty">No accountability events yet.</p>
+    {% endfor %}
+{% endif %}
+</div>

@@ -2,11 +2,10 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Handoff — Care Coordination Dashboard</title>
+    <title>Handoff — My Patients</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: linear-gradient(180deg, #eef3f9 0%, #e6edf5 100%); margin: 0; padding: 0; color: #16283f; min-height: 100vh; }
-        /* ---------- Header ---------- */
         .topbar { background: linear-gradient(90deg, #0b1828 0%, #10233c 60%, #14304f 100%); color: white; padding: 12px 22px; display: flex; align-items: center; gap: 18px; box-shadow: 0 2px 10px rgba(11,24,40,0.35); }
         .brand { display: flex; align-items: center; white-space: nowrap; }
         .brandmark-sm { width: 27px; height: 27px; margin-right: 9px; }
@@ -29,7 +28,8 @@
         .userchip .who .n { font-size: 13px; font-weight: bold; }
         .userchip .who .r { font-size: 11px; color: #9db8dd; }
         .userchip a { color: #7db4ff; font-size: 12.5px; text-decoration: none; margin-left: 6px; }
-        /* ---------- Metrics ---------- */
+        .flash-wrap { margin: 12px 22px 0; }
+        .flash { background: #fff8e1; border: 1px solid #f3d27a; color: #6d5200; border-radius: 8px; padding: 9px 14px; font-size: 13px; }
         .metrics { display: flex; gap: 14px; padding: 18px 22px 4px; flex-wrap: wrap; }
         .metric { background: white; border-radius: 12px; padding: 14px 18px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); flex: 1 1 150px; display: flex; align-items: center; justify-content: space-between; }
         .metric .num { font-size: 27px; font-weight: 800; color: #10233c; }
@@ -37,27 +37,44 @@
         .metric.alert .num { color: #d93025; }
         .metric .icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: none; margin-left: 10px; }
         .icon.amber { background: #fef7e0; } .icon.blue { background: #e8f0fe; } .icon.red { background: #fce8e6; } .icon.green { background: #e6f4ea; }
-        /* ---------- Board ---------- */
         .search-note { margin: 12px 22px 0; background: #fff8e1; border: 1px solid #f3d27a; color: #6d5200; border-radius: 8px; padding: 9px 14px; font-size: 13px; }
         .search-note a { color: #174ea6; font-weight: bold; }
-        .board { display: flex; gap: 16px; padding: 16px 22px 20px; align-items: flex-start; }
-        .column { flex: 1; background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); min-height: 300px; max-height: 76vh; overflow-y: auto; }
-        .column.new { border-top: 5px solid #f9ab00; }
-        .column.in-progress { border-top: 5px solid #1a73e8; }
-        .column.escalated { border-top: 5px solid #d93025; }
-        .column.completed { border-top: 5px solid #188038; }
-        .col-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eef1f4; padding-bottom: 9px; margin-bottom: 12px; }
-        .col-head h2 { margin: 0; font-size: 14px; letter-spacing: 1.2px; }
-        .column.new h2 { color: #9a6a00; } .column.in-progress h2 { color: #174ea6; }
-        .column.escalated h2 { color: #a50e0e; } .column.completed h2 { color: #137333; }
-        .count-pill { font-size: 12px; font-weight: bold; border-radius: 11px; padding: 2px 10px; background: #eef1f4; color: #3c4a5c; }
-        .column.new .count-pill { background: #fef7e0; color: #9a6a00; }
-        .column.in-progress .count-pill { background: #e8f0fe; color: #174ea6; }
-        .column.escalated .count-pill { background: #fce8e6; color: #a50e0e; }
-        .column.completed .count-pill { background: #e6f4ea; color: #137333; }
-        .col-empty { color: #8a97a8; font-size: 13px; text-align: center; padding: 18px 0; }
+        .wrap { padding: 16px 22px 8px; }
+        .section-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+        .section-head h2 { margin: 6px 0; font-size: 19px; color: #10233c; }
+        .section-sub { font-size: 12.5px; color: #63758c; }
+        .section-sub a { color: #174ea6; font-weight: bold; }
+        .patient-block { background: white; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); margin-bottom: 16px; }
+        .patient-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+        .patient-id { flex: 1; min-width: 240px; }
+        .unread-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #d93025; margin-right: 7px; vertical-align: middle; }
+        .patient-name { font-size: 17px; font-weight: 800; color: #10233c; text-decoration: none; }
+        .patient-name:hover { text-decoration: underline; }
+        .patient-meta { display: block; font-size: 12px; color: #63758c; margin-top: 3px; }
+        .open-btn { font-size: 12.5px; font-weight: bold; color: #174ea6; text-decoration: none; border: 1px solid #ccd6e2; border-radius: 7px; padding: 6px 12px; }
+        .open-btn:hover { background: #e8f0fe; }
+        .latest-line { display: flex; justify-content: space-between; gap: 14px; margin-top: 11px; background: #f6f9fc; border: 1px solid #e2e9f2; border-radius: 8px; padding: 9px 12px; text-decoration: none; color: #22344c; font-size: 13.5px; }
+        .latest-line:hover { border-color: #7db4ff; }
+        .latest-time { color: #63758c; white-space: nowrap; font-size: 12px; }
+        .strip-chips { display: flex; gap: 10px; margin-top: 11px; flex-wrap: wrap; }
+        .strip-chip { flex: 1 1 200px; border: 1px solid #e2e9f2; border-radius: 8px; padding: 8px 11px; text-decoration: none; background: white; }
+        .strip-chip:hover { border-color: #7db4ff; }
+        .strip-chip-k { display: block; font-size: 10.5px; font-weight: bold; letter-spacing: 0.7px; text-transform: uppercase; color: #63758c; }
+        .strip-chip-v { display: block; font-size: 12.5px; color: #22344c; margin-top: 3px; }
+        .block-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; margin-top: 14px; }
+        .no-open, .empty-block { font-size: 13px; color: #63758c; }
+        .empty-block { background: white; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(16,42,74,0.06); }
+        .auth-list { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); overflow: hidden; }
+        .auth-row { display: flex; align-items: center; gap: 14px; padding: 11px 16px; text-decoration: none; color: #22344c; border-bottom: 1px solid #eef1f4; }
+        .auth-row:last-child { border-bottom: none; }
+        .auth-row:hover { background: #f6f9fc; }
+        .auth-main { flex: 0 1 330px; min-width: 200px; }
+        .auth-name { font-weight: bold; font-size: 14px; }
+        .auth-meta { display: block; font-size: 11.5px; color: #63758c; }
+        .auth-latest { flex: 1; font-size: 12.5px; color: #3c4a5c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .auth-open { font-size: 12px; font-weight: bold; color: #174ea6; white-space: nowrap; }
         /* ---------- Cards ---------- */
-        .card { background: #ffffff; border: 1px solid #e2e9f2; padding: 13px 14px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 1px 4px rgba(16,42,74,0.07); }
+        .card { background: #ffffff; border: 1px solid #e2e9f2; padding: 13px 14px; border-radius: 10px; box-shadow: 0 1px 4px rgba(16,42,74,0.07); }
         .card.stale-amber { border-left: 5px solid #f9ab00; }
         .card.stale-red { border-left: 5px solid #d93025; background: #fffafa; }
         .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -65,6 +82,10 @@
         .card-dots { color: #a7b3c2; font-size: 13px; letter-spacing: 1px; }
         .card-case { font-size: 12px; color: #63758c; margin-top: 2px; }
         .card-patient { font-size: 12.5px; color: #3c4a5c; margin-top: 3px; letter-spacing: 0.3px; }
+        .card-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        .sec-chip { font-size: 10.5px; font-weight: bold; letter-spacing: 0.6px; text-transform: uppercase; background: #eef1f4; color: #3c4a5c; border-radius: 10px; padding: 2px 9px; }
+        .ack-chip { font-size: 10.5px; font-weight: bold; background: #fef7e0; color: #9a6a00; border-radius: 10px; padding: 2px 9px; }
+        .canceled-chip { font-size: 10.5px; font-weight: bold; background: #f1f3f4; color: #48586c; border-radius: 10px; padding: 2px 9px; }
         .card-meta { margin-top: 9px; }
         .pill { display: inline-block; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 11px; background: #e8f0fe; color: #174ea6; }
         .pill.amber { background: #fef7e0; color: #9a6a00; }
@@ -75,30 +96,42 @@
         .owner-name { font-size: 12.5px; font-weight: bold; color: #22344c; }
         .owner-role { font-size: 11px; color: #63758c; }
         .initiator-line { font-size: 11px; color: #8a97a8; margin-top: 7px; }
+        .ack-line { font-size: 11.5px; margin-top: 8px; }
+        .ack-ok { color: #137333; font-weight: bold; }
+        .ack-wait { color: #9a6a00; }
         .owner-note { font-size: 12px; color: #63758c; margin: 10px 0 0; }
         .action-form { margin-top: 10px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
         .action-form label { font-size: 12px; font-weight: bold; color: #3c4a5c; }
         .action-form select { flex: 1; min-width: 120px; }
+        .ack-form { align-items: center; }
+        .ack-hint { font-size: 11.5px; color: #63758c; }
+        .cancel-wrap { margin-top: 12px; font-size: 12.5px; }
+        .cancel-wrap summary { cursor: pointer; font-weight: bold; color: #a50e0e; }
+        .cancel-form { margin-top: 8px; display: grid; gap: 7px; }
+        .cancel-form label { font-size: 12px; font-weight: bold; color: #3c4a5c; }
         .note-form { margin-top: 12px; border-top: 1px dashed #e2e9f2; padding-top: 10px; }
         .note-form label { font-size: 12px; font-weight: bold; color: #3c4a5c; display: block; margin-bottom: 5px; }
-        .note-row { margin-top: 6px; display: flex; gap: 7px; }
+        .note-row { margin-top: 6px; display: flex; gap: 7px; flex-wrap: wrap; }
         select, input[type="text"], textarea { padding: 6px 8px; border: 1px solid #ccd6e2; border-radius: 6px; font-size: 13px; background: white; }
         textarea { width: 100%; }
         button { background: #1a73e8; color: white; border: none; padding: 7px 13px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
         button:hover { background: #1765cc; }
         button.secondary { background: #5f7086; }
         button.secondary:hover { background: #48586c; }
+        button.danger { background: #a50e0e; }
+        button.danger:hover { background: #7f0b0b; }
         details.history { margin-top: 12px; }
         details.history summary { font-size: 12.5px; cursor: pointer; font-weight: bold; color: #174ea6; }
         .history-body { margin-top: 8px; }
         .history-item { margin-bottom: 7px; font-size: 12.5px; }
         .record-text { background: #f6f9fc; border: 1px solid #e2e9f2; border-radius: 6px; padding: 5px 8px; margin-top: 3px; }
+        .rec-cat { font-size: 10.5px; font-weight: bold; background: #e8f0fe; color: #174ea6; border-radius: 9px; padding: 1px 8px; margin-left: 6px; }
         .time { font-size: 12px; }
+        #updates-pill { display: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; background: #10233c; color: white; border: none; border-radius: 22px; padding: 11px 22px; font-size: 13.5px; box-shadow: 0 6px 20px rgba(11,24,40,0.4); z-index: 50; cursor: pointer; }
         .imprint { background: #0b1828; color: #9db8dd; text-align: center; padding: 15px 16px 17px; font-size: 12.5px; letter-spacing: 0.4px; margin-top: 4px; }
         .imprint strong { color: white; }
         .imprint .sub2 { font-size: 11px; color: #63758c; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase; }
-        /* ---------- Create ---------- */
-        .create-wrap { background: white; margin: 0 22px 26px; border-radius: 12px; padding: 18px 22px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); }
+        .create-wrap { background: white; margin: 8px 22px 26px; border-radius: 12px; padding: 18px 22px; box-shadow: 0 2px 8px rgba(16,42,74,0.08); }
         .create-wrap h2 { margin-top: 0; font-size: 17px; color: #10233c; }
         .form-row { display: flex; gap: 14px; flex-wrap: wrap; }
         .form-row div { flex: 1; min-width: 150px; }
@@ -106,15 +139,15 @@
         .form-row label { font-size: 12px; font-weight: bold; color: #3c4a5c; display: block; margin-bottom: 4px; }
         .form-row input, .form-row select { width: 100%; }
         @media (max-width: 900px) {
-            .board { flex-direction: column; padding: 14px; }
-            .column { width: 100%; max-height: none; }
             .metrics { padding: 12px 14px 0; gap: 10px; }
             .metric { flex: 1 1 42%; padding: 10px 14px; }
             .metric .num { font-size: 22px; }
             .topbar { flex-wrap: wrap; padding: 12px 14px; }
             .searchbox { order: 3; flex-basis: 100%; max-width: none; }
-            .create-wrap { margin: 0 14px 20px; }
-            .search-note { margin: 12px 14px 0; }
+            .wrap { padding: 14px; }
+            .create-wrap { margin: 8px 14px 20px; }
+            .flash-wrap, .search-note { margin: 12px 14px 0; }
+            .auth-latest { display: none; }
             button { padding: 9px 14px; }
             select, input[type="text"], textarea { font-size: 16px; }
         }
@@ -124,43 +157,40 @@
     <div class="topbar">
         <div class="brand"><svg class="brandmark-sm" viewBox="0 0 48 48" aria-label="Handoff logo"><path d="M9 32 Q24 8 39 16" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/><circle cx="9" cy="32" r="5" fill="none" stroke="#ffffff" stroke-width="3.5"/><circle cx="24" cy="15.6" r="3" fill="#7db4ff"/><circle cx="39" cy="16" r="5.5" fill="#7db4ff"/></svg><span class="wordmark-sm">HANDOFF</span><span class="brand-sub">Care Coordination</span></div>
         <form class="searchbox" method="GET" action="{{ url_for('index') }}">
-            <input type="text" name="q" value="{{ q }}" placeholder="Search patients, cases, or team members..." aria-label="Search handoffs">
+            <input type="text" name="q" value="{{ q }}" placeholder="Search patients, cases, or team members..." aria-label="Search patients">
         </form>
         {% set cm = user_meta.get(current_user.id) %}
         <div class="userchip">
             <div class="avatar" style="background: {{ cm.color if cm else '#5f6368' }}">{{ cm.initials if cm else '?' }}</div>
             <div class="who"><div class="n">{{ current_user.name }}</div><div class="r">{{ current_user.role_name }}</div></div>
+            <a href="{{ url_for('board') }}">Operations Board</a>
             <a href="{{ url_for('logout') }}">Sign out</a>
         </div>
     </div>
 
     <div class="bylinebar">Created by <strong>Derrick D. Dennis</strong></div>
 
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="flash-wrap">{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}</div>
+    {% endif %}
+    {% endwith %}
+
     <div class="metrics">
-        <div class="metric"><div><div class="num">{{ metrics.NEW }}</div><div class="lbl">New</div></div><div class="icon amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b06000" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div></div>
-        <div class="metric"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">In Progress</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></div>
-        <div class="metric alert"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">Escalated</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></div>
-        <div class="metric"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">Completed</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></div>
+        <div class="metric"><div><div class="num">{{ metrics.NEW }}</div><div class="lbl">NEW</div></div><div class="icon amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b06000" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div></div>
+        <div class="metric"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">IN PROGRESS</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></div>
+        <div class="metric alert"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">ESCALATED</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></div>
+        <div class="metric"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">COMPLETED</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></div>
         <div class="metric{% if metrics.stale %} alert{% endif %}"><div><div class="num">{{ metrics.stale }}</div><div class="lbl">Waiting Too Long</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></div>
         <div class="metric"><div><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></div>
     </div>
 
     {% if q %}
-    <div class="search-note">Showing {{ handoffs|length }} of {{ total_count }} handoffs matching &ldquo;{{ q }}&rdquo;. <a href="{{ url_for('index') }}">Clear search</a></div>
+    <div class="search-note">Showing patients matching &ldquo;{{ q }}&rdquo;. <a href="{{ url_for('index') }}">Clear search</a></div>
     {% endif %}
 
-    <div class="board">
-        {% for status, cls, label in [("NEW", "new", "NEW"), ("IN_PROGRESS", "in-progress", "IN PROGRESS"), ("ESCALATED", "escalated", "ESCALATED"), ("COMPLETED", "completed", "COMPLETED")] %}
-        <div class="column {{ cls }}">
-            <div class="col-head"><h2>{{ label }}</h2><span class="count-pill">{{ handoffs|selectattr("status", "equalto", status)|list|length }}</span></div>
-            {% set col = handoffs|selectattr("status", "equalto", status)|list %}
-            {% for h in col %}
-                {% include "handoff_card.html" %}
-            {% else %}
-                <div class="col-empty">No handoffs here{% if q %} match your search{% endif %}.</div>
-            {% endfor %}
-        </div>
-        {% endfor %}
+    <div class="wrap" id="worklist-wrap">
+        {% include "worklist_blocks.html" %}
     </div>
 
     <div class="create-wrap">
@@ -192,6 +222,20 @@
                     <input type="text" name="event" placeholder="MRI / Lab / Consult" required>
                 </div>
                 <div>
+                    <label>Section</label>
+                    <select name="section">
+                        <option value="">Auto (from event)</option>
+                        <option value="LABS">Labs</option>
+                        <option value="DIAGNOSTICS">Diagnostics / Imaging</option>
+                        <option value="CONSULTS">Consultations</option>
+                        <option value="TASKS">Care Tasks</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Care context (optional)</label>
+                    <input type="text" name="patient_context" placeholder="e.g. Stroke Protocol">
+                </div>
+                <div>
                     <label>Pass the baton to (first owner)</label>
                     <select name="owner" required>
                         <option value="" disabled selected>-- Select Role --</option>
@@ -201,10 +245,12 @@
                     </select>
                 </div>
             </div>
-            <p style="font-size:12px; color:#63758c;">You are creating this handoff as <strong>{{ current_user.name }}</strong> ({{ current_user.role_name }}). You are recorded as the initiator.</p>
+            <p style="font-size:12px; color:#63758c;">You are creating this handoff as <strong>{{ current_user.name }}</strong> ({{ current_user.role_name }}). You are recorded as the initiator. If the first owner is someone else, the assignment starts <strong>unacknowledged</strong> until they confirm receipt.</p>
             <button type="submit">Create Handoff</button>
         </form>
     </div>
+
+    <button id="updates-pill" type="button">New updates available — tap to refresh</button>
 
     <div class="imprint">
         Created by <strong>Derrick D. Dennis</strong>
@@ -212,20 +258,62 @@
     </div>
 
 <script>
-document.querySelectorAll('.time').forEach(el => {
-    const time = el.getAttribute('data-time');
-    if (time) {
-        const diffMs = new Date() - new Date(time);
-        const diffSeconds = Math.floor(diffMs / 1000);
-        const diffMinutes = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        if (diffSeconds < 60) el.innerText = "just now";
-        else if (diffMinutes < 60) el.innerText = diffMinutes + " min ago";
-        else if (diffHours < 24) el.innerText = diffHours + " hr ago";
-        else el.innerText = diffDays === 1 ? "1 day ago" : diffDays + " days ago";
-    }
-});
+function formatTimes() {
+    document.querySelectorAll('.time').forEach(el => {
+        const time = el.getAttribute('data-time');
+        if (time) {
+            const diffMs = new Date() - new Date(time);
+            const diffSeconds = Math.floor(diffMs / 1000);
+            const diffMinutes = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            if (diffSeconds < 60) el.innerText = "just now";
+            else if (diffMinutes < 60) el.innerText = diffMinutes + " min ago";
+            else if (diffHours < 24) el.innerText = diffHours + " hr ago";
+            else el.innerText = diffDays === 1 ? "1 day ago" : diffDays + " days ago";
+        }
+    });
+}
+formatTimes();
+
+/* --- Safe automatic updates: poll a version stamp; swap only the patient
+       blocks, and NEVER while a form holds unsaved work. --- */
+let pageVersion = "{{ state_version }}";
+let formDirty = false;
+document.addEventListener('input', e => {
+    if (e.target.closest && e.target.closest('form')) formDirty = true;
+}, true);
+function editingNow() {
+    const a = document.activeElement;
+    const busy = a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type === 'text')) && a.value && a.value.trim().length > 0;
+    return formDirty || !!busy;
+}
+async function refreshBlocks() {
+    try {
+        const r = await fetch("{{ url_for('fragment_worklist') }}");
+        if (!r.ok) return;
+        document.getElementById('worklist-wrap').innerHTML = await r.text();
+        formatTimes();
+        const s = await (await fetch("{{ url_for('api_state') }}")).json();
+        pageVersion = s.version;
+        formDirty = false;
+        document.getElementById('updates-pill').style.display = 'none';
+    } catch (e) { /* retried on the next tick */ }
+}
+async function poll() {
+    try {
+        const s = await (await fetch("{{ url_for('api_state') }}")).json();
+        if (s.version !== pageVersion) {
+            if (editingNow()) {
+                document.getElementById('updates-pill').style.display = 'block';
+            } else {
+                await refreshBlocks();
+            }
+        }
+    } catch (e) { /* silent: updates must never break the page */ }
+}
+document.getElementById('updates-pill').addEventListener('click', refreshBlocks);
+setInterval(poll, 20000);
 </script>
 </body>
 </html>

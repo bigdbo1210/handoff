@@ -7,6 +7,20 @@
 <div class="card-case">Case {{ h.case_id }}</div>
 <div class="card-patient">{{ h.patient_name }}{% if h.age %} &nbsp;|&nbsp; {{ h.age }} y/o{% endif %}{% if h.sex %} &nbsp;|&nbsp; {{ h.sex }}{% endif %}</div>
 
+{% set sec_labels = {"LABS": "Labs", "DIAGNOSTICS": "Diagnostics / Imaging", "CONSULTS": "Consultations", "TASKS": "Care Tasks"} %}
+{% set open_task = h.status not in ("COMPLETED", "CANCELED") %}
+{% set is_owner = h.owner|string == current_user.id %}
+
+<div class="card-chips">
+    <span class="sec-chip">{{ sec_labels.get(h.get('section'), "Care Tasks") }}</span>
+    {% if open_task and not h.get('acknowledged_at') %}
+        <span class="ack-chip">Awaiting acknowledgment</span>
+    {% endif %}
+    {% if h.status == "CANCELED" %}
+        <span class="canceled-chip">Canceled</span>
+    {% endif %}
+</div>
+
 <div class="card-meta">
     {% if h.status == "COMPLETED" %}
         <span class="pill done">&#10003; <span class="time" data-time="{{ h.updated_at }}">just now</span></span>
@@ -19,15 +33,23 @@
 <div class="owner-row">
     <div class="avatar" style="background: {{ om.color if om else '#5f6368' }}">{{ om.initials if om else '?' }}</div>
     <div class="owner-text">
-        <div class="owner-name">{{ om.name if om else 'Unknown' }}{% if h.owner|string == current_user.id %} <em>(you)</em>{% endif %}</div>
+        <div class="owner-name">{{ om.name if om else 'Unknown' }}{% if is_owner %} <em>(you)</em>{% endif %}</div>
         <div class="owner-role">{{ om.role if om else '' }}</div>
     </div>
 </div>
 <div class="initiator-line">Initiated by {{ user_meta.get(h.initiator|string).name if user_meta.get(h.initiator|string) else 'Unknown' }} · {{ roles.get(h.initiator|string, "") }}</div>
+<div class="ack-line">
+    {% if h.get('acknowledged_at') %}
+        <span class="ack-ok">✓ {{ (user_meta.get(h.acknowledged_by|string).name if user_meta.get(h.acknowledged_by|string) else 'Owner') }} acknowledged assignment</span>
+    {% elif open_task %}
+        <span class="ack-wait">Holding the baton ≠ confirmed receipt — this assignment has not been acknowledged yet.</span>
+    {% endif %}
+</div>
 
-{% if h.owner|string == current_user.id and h.status != "COMPLETED" %}
+{% if is_owner and open_task %}
 <form method="POST" action="/update-status" class="action-form">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
     <label>Status:</label>
     <select name="status">
         <option value="NEW" {% if h.status == "NEW" %}selected{% endif %}>NEW</option>
@@ -40,6 +62,7 @@
 
 <form method="POST" action="/transfer-owner" class="action-form">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
     <label>Pass the baton to:</label>
     <select name="new_owner">
         {% for uid, u in users.items() %}
@@ -50,12 +73,35 @@
     </select>
     <button type="submit">Transfer</button>
 </form>
-{% elif h.status != "COMPLETED" %}
+
+{% if not h.get('acknowledged_at') %}
+<form method="POST" action="/acknowledge" class="action-form ack-form">
+    <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <button type="submit" class="secondary">Acknowledge Assignment</button>
+    <span class="ack-hint">Confirm you received the baton for this task.</span>
+</form>
+{% endif %}
+{% elif open_task %}
 <p class="owner-note">Only the current owner can change status or pass the baton.</p>
+{% endif %}
+
+{% if open_task and (is_owner or current_user.role_id|string in ("4", "6")) %}
+<details class="cancel-wrap">
+    <summary>Cancel this handoff…</summary>
+    <form method="POST" action="/cancel-handoff" class="cancel-form">
+        <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <label>Reason for canceling (required):</label>
+        <input type="text" name="reason" maxlength="300" placeholder="Why is this handoff being canceled?" required>
+        <button type="submit" class="danger">Cancel Handoff</button>
+    </form>
+</details>
 {% endif %}
 
 <form method="POST" action="/add-note" class="note-form">
     <input type="hidden" name="handoff_id" value="{{ h.handoff_id }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
     <label>Add to the record (any team member):</label>
     <textarea name="text" rows="2" maxlength="1000" placeholder="Note, order, or update for this handoff..." required></textarea>
     <div class="note-row">
@@ -63,6 +109,12 @@
             <option value="NOTE">Note</option>
             <option value="ORDER">Order</option>
             <option value="UPDATE">Update</option>
+        </select>
+        <select name="category">
+            <option value="GENERAL">General</option>
+            <option value="LAB">Lab</option>
+            <option value="DIAGNOSTIC">Diagnostic / Imaging</option>
+            <option value="CONSULT">Consultation</option>
         </select>
         <button type="submit" class="secondary">Add to Record</button>
     </div>
@@ -76,6 +128,7 @@
                 <div class="history-item">
                     {% if item.event == "RECORD_ADDED" %}
                         <strong>{{ item.type|title }} added</strong> by {{ roles.get(item.by|string, item.by) }}
+                        {% if item.get('category') and item.category != "GENERAL" %}<span class="rec-cat">{{ item.category|title }}</span>{% endif %}
                         <div class="record-text">{{ item.text }}</div>
                     {% elif item.event == "OWNERSHIP_TRANSFERRED" %}
                         <strong>Ownership Transferred</strong><br>
@@ -87,6 +140,13 @@
                                 {{ item.by }}
                             {% endif %}
                         </small>
+                    {% elif item.event == "ASSIGNMENT_ACKNOWLEDGED" %}
+                        <strong>Assignment Acknowledged</strong>
+                        <br><small>By: {{ roles.get(item.by|string, item.by) }}</small>
+                    {% elif item.event == "HANDOFF_CANCELED" %}
+                        <strong>Handoff Canceled</strong>
+                        <br><small>By: {{ roles.get(item.by|string, item.by) }}</small>
+                        {% if item.get('reason') %}<div class="record-text">Reason: {{ item.reason }}</div>{% endif %}
                     {% else %}
                         <strong>{{ item.event|replace('_', ' ')|title }}</strong>
                         {% if item.by is defined %}
