@@ -57,6 +57,7 @@
         <option value="ESCALATED" {% if h.status == "ESCALATED" %}selected{% endif %}>ESCALATED</option>
         <option value="COMPLETED" {% if h.status == "COMPLETED" %}selected{% endif %}>COMPLETED</option>
     </select>
+    <input type="text" name="outcome" maxlength="500" placeholder="Documented outcome (required to complete)" style="flex:1; min-width:180px">
     <button type="submit">Update</button>
 </form>
 
@@ -104,6 +105,11 @@
     <input type="hidden" name="next" value="{{ request.full_path }}">
     <label>Add to the record (any team member):</label>
     <textarea name="text" rows="2" maxlength="1000" placeholder="Note, order, or update for this handoff..." required></textarea>
+    <div class="note-row" style="align-items:center">
+        <label style="font-weight:normal"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+        <label style="font-weight:normal"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+    </div>
+    <div class="ack-hint">Two patient identifiers must be confirmed before documenting care.</div>
     <div class="note-row">
         <select name="note_type">
             <option value="NOTE">Note</option>
@@ -129,6 +135,7 @@
                     {% if item.event == "RECORD_ADDED" %}
                         <strong>{{ item.type|title }} added</strong> by {{ roles.get(item.by|string, item.by) }}
                         {% if item.get('category') and item.category != "GENERAL" %}<span class="rec-cat">{{ item.category|title }}</span>{% endif %}
+                        {% if item.get('id_confirmed') %}<span class="rec-cat">2 identifiers confirmed</span>{% endif %}
                         <div class="record-text">{{ item.text }}</div>
                     {% elif item.event == "OWNERSHIP_TRANSFERRED" %}
                         <strong>Ownership Transferred</strong><br>
@@ -147,6 +154,10 @@
                         <strong>Handoff Canceled</strong>
                         <br><small>By: {{ roles.get(item.by|string, item.by) }}</small>
                         {% if item.get('reason') %}<div class="record-text">Reason: {{ item.reason }}</div>{% endif %}
+                    {% elif item.event.startswith("STATUS_CHANGED_TO_") and item.get('outcome') %}
+                        <strong>{{ item.event|replace('_', ' ')|title }}</strong>
+                        <br><small>By: {{ roles.get(item.by|string, item.by) }}</small>
+                        <div class="record-text">Documented outcome: {{ item.outcome }}</div>
                     {% else %}
                         <strong>{{ item.event|replace('_', ' ')|title }}</strong>
                         {% if item.by is defined %}

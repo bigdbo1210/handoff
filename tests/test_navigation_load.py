@@ -34,7 +34,7 @@ def check(label, condition):
 
 def login(username):
     client = handoff_app.app.test_client()
-    resp = client.post("/login", data={"username": username, "password": "handoff123"})
+    resp = client.post("/login", data={"username": username, "password": "NinaUAT2026!" if username == "njohnson" else "handoff123"})
     assert resp.status_code == 302, username
     return client
 
@@ -106,7 +106,7 @@ def main():
     williams = login("dwilliams")
     hid = [h["handoff_id"] for h in handoff_app.load_handoffs() if h["case_id"] == "A44219"][0]
     williams.post("/add-note", data={"handoff_id": hid, "note_type": "UPDATE", "category": "LAB",
-                                     "text": "Troponin resulted: 0.04 — within normal limits."})
+                                     "text": "Troponin resulted: 0.04 — within normal limits.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     state2 = nina.get("/api/state").get_json()
     check("version changes when a teammate records activity", state2["version"] != state1["version"])
     check("JOHNSON becomes unread for Nina", state2["unread"].get("A44219") is True)

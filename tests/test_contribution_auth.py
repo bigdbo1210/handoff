@@ -35,7 +35,7 @@ def check(label, condition):
 
 def login(username):
     client = handoff_app.app.test_client()
-    resp = client.post("/login", data={"username": username, "password": "handoff123"})
+    resp = client.post("/login", data={"username": username, "password": "NinaUAT2026!" if username == "njohnson" else "handoff123"})
     assert resp.status_code == 302, username
     return client
 
@@ -80,10 +80,10 @@ def main():
 
     print("== Authorized clinicians contribute, baton or not ==")
     r = nina.post("/add-note", data={"handoff_id": lewis["handoff_id"],
-                                     "note_type": "NOTE", "text": "Wound edges improving."})
+                                     "note_type": "NOTE", "text": "Wound edges improving.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("team member without the baton can contribute", r.status_code == 302)
     r = erin.post("/add-note", data={"handoff_id": lewis["handoff_id"],
-                                     "note_type": "NOTE", "text": "Dressing changed."})
+                                     "note_type": "NOTE", "text": "Dressing changed.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("the baton holder can contribute", r.status_code == 302)
     h = task("P78193", "Wound Care")
     entries = [e for e in h["history"] if e["event"] == "RECORD_ADDED"]
@@ -95,7 +95,7 @@ def main():
     check("contributing never moved the baton", h["owner"] == lewis["owner"])
 
     r = thompson.post("/add-note", data={"handoff_id": task("D55231")["handoff_id"],
-                                         "note_type": "NOTE", "text": "Charge review."})
+                                         "note_type": "NOTE", "text": "Charge review.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("unit-wide organizational access can contribute anywhere", r.status_code == 302)
 
     print("== The approved way onto a team ==")
@@ -104,13 +104,13 @@ def main():
     check("charge nurse adds Morgan to LEE's team", r.status_code == 302)
     check("Morgan can now open the workspace", morgan.get("/patient/E90214").status_code == 200)
     r = morgan.post("/add-note", data={"handoff_id": lee["handoff_id"],
-                                       "note_type": "NOTE", "text": "Family updated."})
+                                       "note_type": "NOTE", "text": "Family updated.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("the newly added member can contribute", r.status_code == 302)
 
     r = nina.post("/team/add", data={"case_id": "P78193", "user_id": "2"})
     check("a team member adds Williams to LEWIS's team", r.status_code == 302)
     r = williams.post("/add-note", data={"handoff_id": lewis["handoff_id"],
-                                         "note_type": "NOTE", "text": "Now on the team."})
+                                         "note_type": "NOTE", "text": "Now on the team.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("Williams contributes after being added", r.status_code == 302)
     r = williams.post("/update-status", data={"handoff_id": lewis["handoff_id"], "status": "COMPLETED"})
     check("membership never grants baton actions (still 403)", r.status_code == 403)

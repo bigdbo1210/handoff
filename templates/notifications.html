@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Handoff — Notifications Center</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(180deg, #eef3f9 0%, #e6edf5 100%); margin: 0; color: #16283f; min-height: 100vh; }
+        .topbar { background: linear-gradient(90deg, #0b1828 0%, #10233c 60%, #14304f 100%); color: white; padding: 12px 22px; display: flex; align-items: center; gap: 18px; }
+        .wordmark-sm { font-weight: 800; letter-spacing: 2.5px; font-size: 19px; }
+        .brand-sub { color: #7db4ff; font-size: 12px; letter-spacing: 2.2px; text-transform: uppercase; margin-left: 12px; font-weight: bold; }
+        .topbar a { color: #7db4ff; font-size: 12.5px; text-decoration: none; margin-left: auto; }
+        .wrap { max-width: 880px; margin: 0 auto; padding: 18px 22px 30px; }
+        h1 { font-size: 21px; color: #10233c; margin: 4px 0 4px; }
+        .sub { font-size: 13px; color: #63758c; margin: 0 0 16px; }
+        .notif { background: white; border: 1px solid #e2e9f2; border-radius: 10px; padding: 13px 15px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(16,42,74,0.07); }
+        .notif.unread { border-left: 5px solid #1a73e8; }
+        .n-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .n-kind { font-size: 11px; font-weight: bold; letter-spacing: 0.7px; text-transform: uppercase; color: #174ea6; }
+        .n-patient { font-weight: bold; color: #10233c; text-decoration: none; }
+        .n-patient:hover { text-decoration: underline; }
+        .n-text { font-size: 14px; color: #22344c; margin-top: 5px; }
+        .n-meta { font-size: 12px; color: #63758c; margin-top: 6px; }
+        .chip { font-size: 10.5px; font-weight: bold; border-radius: 9px; padding: 1px 8px; margin-left: 6px; }
+        .chip.new { background: #e8f0fe; color: #174ea6; }
+        .chip.ack { background: #e6f4ea; color: #137333; }
+        .chip.need { background: #fef7e0; color: #9a6a00; }
+        button { background: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: bold; margin-top: 8px; }
+        button:hover { background: #1765cc; }
+        .empty { background: white; border: 1px solid #e2e9f2; border-radius: 10px; padding: 22px; text-align: center; color: #63758c; font-size: 14px; }
+        .imprint { background: #0b1828; color: #9db8dd; text-align: center; padding: 15px 16px 17px; font-size: 12.5px; margin-top: 26px; }
+        .imprint strong { color: white; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div><span class="wordmark-sm">HANDOFF</span><span class="brand-sub">Care Coordination</span></div>
+        <a href="{{ url_for('index') }}">‹ My Patients</a>
+        <a href="{{ url_for('logout') }}" style="margin-left:14px">Sign out</a>
+    </div>
+    <div class="wrap">
+        <h1>Notifications Center</h1>
+        <p class="sub">Meaningful activity on your patients only. Viewing is not acknowledgment — alerts that require it keep their Acknowledge button until you confirm. Signed in as {{ current_user.name }}, {{ current_user.role_name }}.</p>
+        {% if items %}
+            {% for n in items %}
+            <div class="notif{% if not n.read %} unread{% endif %}">
+                <div class="n-head">
+                    <span class="n-kind">{{ n.label }}</span>
+                    <a class="n-patient" href="{{ url_for('patient_page', case_id=n.case_id) }}">{{ n.patient_name }} · Case {{ n.case_id }}</a>
+                </div>
+                <div class="n-text">{{ n.text }}</div>
+                <div class="n-meta">
+                    {% set bm = user_meta.get(n.by|string) %}{{ bm.name if bm else "System" }}{% if bm %} · {{ bm.role }}{% endif %} · <span class="time" data-time="{{ n.at }}">{{ n.at }}</span>
+                    {% if not n.read %}<span class="chip new">New</span>{% endif %}
+                    {% if n.ack_required and n.acked %}<span class="chip ack">Acknowledged ✓</span>{% elif n.ack_required %}<span class="chip need">Acknowledgment required</span>{% endif %}
+                </div>
+                {% if n.ack_required and not n.acked %}
+                <form method="POST" action="{{ url_for('notifications_ack') }}">
+                    <input type="hidden" name="key" value="{{ n.key }}">
+                    <button type="submit">Acknowledge</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">No notifications yet. New orders, results, escalations, bed requests, and responsibility transfers on your patients will appear here.</div>
+        {% endif %}
+    </div>
+    <div class="imprint">Created by <strong>Derrick D. Dennis</strong> · © 2026 · Fictional demonstration data only</div>
+<script>
+document.querySelectorAll('.time').forEach(el => {
+    const t = el.getAttribute('data-time');
+    if (t) {
+        const d = Math.floor((new Date() - new Date(t)) / 60000);
+        el.innerText = d < 1 ? "just now" : d < 60 ? d + " min ago" : d < 1440 ? Math.floor(d / 60) + " hr ago" : Math.floor(d / 1440) + " day(s) ago";
+    }
+});
+</script>
+</body>
+</html>

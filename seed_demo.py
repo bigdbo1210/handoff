@@ -15,6 +15,71 @@ from datetime import datetime, timedelta, timezone
 
 DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "handoffs.json")
 
+# Patient identifiers for the Directive 3.0 UAT build: every seeded patient
+# carries a date of birth and MRN, and a FIN where the encounter has one.
+# The five review patients use the same fictional identifiers as the
+# Directive 3.0 wireframe; the rest are derived deterministically so a
+# re-seed always produces the same searchable values. All fictional.
+_IDENTIFIERS = {
+    "A44219": {"dob": "07/02/1955", "mrn": "7712045", "fin": "5520117"},
+    "B77102": {"dob": "11/30/1943", "mrn": "6630982", "fin": "5520091"},
+    "C30981": {"dob": "03/14/1958", "mrn": "8841207", "fin": "5520103"},
+    "E90214": {"dob": "02/08/1961", "mrn": "5502716", "fin": "5520130"},
+    "F31407": {"dob": "05/19/2019", "mrn": "9026118", "fin": None},
+}
+
+def _identifiers_for(case_id, age):
+    if case_id in _IDENTIFIERS:
+        return dict(_IDENTIFIERS[case_id])
+    h = sum((i + 1) * ord(c) for i, c in enumerate(str(case_id)))
+    year = 2026 - (age if isinstance(age, int) and age else 40)
+    return {
+        "dob": f"{1 + h % 12:02d}/{1 + h % 28:02d}/{year}",
+        "mrn": str(1000000 + (h * 7919) % 8999999),
+        "fin": "55" + str(10000 + (h * 104729) % 89999),
+    }
+
+def build_seed_care():
+    """Seed the patient-centered sidecar for the UAT build: two worked
+    disposition examples (Directive 3.0) with their notifications.
+    Johnson: intent to admit + bed request recorded, acceptance pending —
+    responsibility has NOT moved. Garcia: acceptance recorded, sign-off
+    still pending — responsibility has NOT moved either."""
+    NOW = datetime.now(timezone.utc)
+    def t(minutes_ago):
+        return (NOW - timedelta(minutes=minutes_ago)).isoformat()
+    return {
+        "members_added": {},
+        "members_removed": {},
+        "follows": [],
+        "read_state": {},
+        "dispositions": {
+            "A44219": {
+                "intent": "ADMIT", "service": "Cardiology (telemetry)",
+                "intent_recorded": {"by": "3", "at": t(95)},
+                "order_placed": {"by": "2", "entered_by": "5", "at": t(88)},
+                "acceptance": None, "completed": None, "responsible": "3",
+            },
+            "B77102": {
+                "intent": "ADMIT", "service": "Inpatient Rehabilitation \u2014 Maple Grove Rehab",
+                "intent_recorded": {"by": "7", "at": t(300)},
+                "order_placed": {"by": "7", "entered_by": None, "at": t(250)},
+                "acceptance": {"recorded_by": "7", "acceptor_label": "Maple Grove Rehab \u2014 Admissions",
+                               "service": "Inpatient Rehabilitation", "at": t(125)},
+                "completed": None, "responsible": "3",
+            },
+        },
+        "notifications": [
+            {"id": "seed-bed-a44219", "case_id": "A44219", "kind": "BED_REQUEST", "by": "2",
+             "text": "Admission order recorded \u2014 bed request (bed-slip) for Cardiology (telemetry). A bed request does not transfer responsibility.",
+             "at": t(88), "ack_required": True},
+            {"id": "seed-acc-b77102", "case_id": "B77102", "kind": "ACCEPTANCE", "by": "7",
+             "text": "Receiving acceptance recorded \u2014 Maple Grove Rehab accepted (Inpatient Rehabilitation). Sign-off still pending; responsibility has not transferred.",
+             "at": t(125), "ack_required": False},
+        ],
+        "notif_state": {},
+    }
+
 def build_seed_handoffs():
     """Return the demo board, with timestamps relative to right now."""
     NOW = datetime.now(timezone.utc)
@@ -25,7 +90,7 @@ def build_seed_handoffs():
     def hid(minutes_ago, suffix):
         return (NOW - timedelta(minutes=minutes_ago)).strftime("%Y%m%d%H%M%S") + "-" + suffix
 
-    return [
+    board = [
     # 1) The hero journey: full baton chain, currently with the NP, in progress.
     {
         "handoff_id": hid(187, "a1b2"),
@@ -498,6 +563,9 @@ def build_seed_handoffs():
         ],
     },
     ]
+    for h in board:
+        h.update(_identifiers_for(h["case_id"], h.get("age")))
+    return board
 
 def main():
     handoffs = build_seed_handoffs()

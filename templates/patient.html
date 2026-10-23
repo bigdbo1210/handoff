@@ -149,6 +149,7 @@
         <div class="userchip">
             <div class="avatar" style="background: {{ cm.color if cm else '#5f6368' }}">{{ cm.initials if cm else '?' }}</div>
             <div class="who"><div class="n">{{ current_user.name }}</div><div class="r">{{ current_user.role_name }}</div></div>
+            <a href="{{ url_for('notifications_page') }}">Notifications{% if notif_unread %} ({{ notif_unread }}){% endif %}</a>
             <a href="{{ url_for('board') }}">Operations Board</a>
             <a href="{{ url_for('logout') }}">Sign out</a>
         </div>
@@ -167,7 +168,7 @@
             <div class="p-title-row">
                 <div class="p-title">
                     <div class="p-name">{{ p.patient_name }}</div>
-                    <div class="p-meta">Case {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %} · {{ p.open_tasks|length }} open task{{ "s" if p.open_tasks|length != 1 }}</div>
+                    <div class="p-meta">Case {{ p.case_id }}{% if p.dob %} · DOB {{ p.dob }}{% endif %}{% if p.mrn %} · MRN {{ p.mrn }}{% endif %}{% if p.fin %} · FIN {{ p.fin }}{% endif %}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %} · {{ p.open_tasks|length }} open task{{ "s" if p.open_tasks|length != 1 }}</div>
                 </div>
                 {% if p.is_following %}
                 <form class="follow-form" method="POST" action="{{ url_for('unfollow_patient') }}">
@@ -241,6 +242,67 @@
             </details>
 
             <div class="checklist-note">Implementation checklist — automatic updates: this page checks for new activity every 20 seconds. Updates never reload over unsaved writing: if you're mid-note, a notice appears and nothing refreshes until you tap it. Every entry here was recorded manually by a named clinician; Handoff has no EMR feed.</div>
+        </div>
+
+        <div class="p-head" style="margin-top:12px">
+            <div class="team-title">Disposition &amp; Responsibility</div>
+            {% if p.disposition %}
+            {% set d = p.disposition %}
+            <div style="font-size:13.5px; margin-bottom:8px">
+                <strong>Current responsible clinician:</strong> {{ d.responsible_label or "Not recorded" }}<br>
+                <strong>Receiving service:</strong> {{ d.receiving or "—" }}
+            </div>
+            {% for s in d.stages %}
+            <div class="task-line">
+                <span><strong>{{ s.label }}</strong><br><span class="task-line-owner">{{ s.detail }}</span></span>
+                <span class="pill{% if s.state == 'done' %} done{% elif s.state == 'current' %} amber{% endif %}">{{ s.state }}</span>
+            </div>
+            {% endfor %}
+            <p class="pane-note" style="margin-top:8px">A bed request or a receiving acceptance alone never removes the current clinician's responsibility. Responsibility transfers only at sign-off, when institution-approved transfer criteria are met. Intent, order placement, acceptance, and completed disposition are recorded as separate facts.</p>
+            {% set rec = d.record %}
+            {% if rec.intent == "ADMIT" and not rec.order_placed %}
+            <form method="POST" action="{{ url_for('disposition_bed_request') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <button type="submit">Record admission order / bed request (bed-slip)</button>
+            </form>
+            {% elif rec.intent == "ADMIT" and rec.order_placed and not rec.acceptance %}
+            <form method="POST" action="{{ url_for('disposition_acceptance') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label>Acceptance — who accepted:</label>
+                <input type="text" name="acceptor_label" placeholder="e.g. Cardiology — Dr. Reyes, or Maple Grove Rehab — Admissions" required>
+                <input type="text" name="service" placeholder="Receiving service (optional)">
+                <button type="submit">Record receiving acceptance</button>
+            </form>
+            {% elif rec.intent == "ADMIT" and rec.acceptance and not rec.completed %}
+            <form method="POST" action="{{ url_for('disposition_sign_off') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label>Sign-off — responsibility accepted by:</label>
+                <select name="new_responsible" required>
+                    {% for uid, u in users.items() %}{% if uid != rec.responsible %}<option value="{{ uid }}">{{ u.role_name }} — {{ u.name }}</option>{% endif %}{% endfor %}
+                </select>
+                <button type="submit">Sign off — transfer responsibility</button>
+                <span class="ack-hint">Only the current responsible clinician (or a charge nurse / care coordinator) can sign off, and only after acceptance is recorded.</span>
+            </form>
+            {% elif rec.intent == "DISCHARGE" and not rec.completed %}
+            <form method="POST" action="{{ url_for('disposition_complete') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <button type="submit">Complete discharge</button>
+                <span class="ack-hint">Recorded by the current responsible clinician (or a charge nurse / care coordinator).</span>
+            </form>
+            {% endif %}
+            {% else %}
+            <p class="pane-note">No disposition intent recorded for this patient yet.</p>
+            <form method="POST" action="{{ url_for('disposition_intent') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label>Intent:</label>
+                <select name="intent">
+                    <option value="ADMIT">Intent to admit</option>
+                    <option value="DISCHARGE">Intent to discharge</option>
+                </select>
+                <input type="text" name="service" placeholder="Intended admitting service, or discharge destination" required>
+                <button type="submit">Record intent</button>
+            </form>
+            {% endif %}
         </div>
 
         <div id="patient-main">

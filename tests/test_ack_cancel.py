@@ -36,7 +36,7 @@ def check(label, condition):
 
 def login(username):
     client = handoff_app.app.test_client()
-    resp = client.post("/login", data={"username": username, "password": "handoff123"})
+    resp = client.post("/login", data={"username": username, "password": "NinaUAT2026!" if username == "njohnson" else "handoff123"})
     assert resp.status_code == 302, username
     return client
 
@@ -109,7 +109,7 @@ def main():
     r = brooks.post("/transfer-owner", data={"handoff_id": hid, "new_owner": "2"})
     check("canceled handoff cannot be transferred -> 400", r.status_code == 400)
     r = brooks.post("/add-note", data={"handoff_id": hid, "note_type": "NOTE",
-                                       "text": "Late note: family informed of the change."})
+                                       "text": "Late note: family informed of the change.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("record entries can still be added after cancellation", r.status_code == 302)
 
     print(f"\n{passed} passed, {failed} failed")

@@ -56,11 +56,13 @@ def role_label(role_id):
 # -----------------------------
 # Users (demo accounts)
 # -----------------------------
-# DEMO ONLY: every demo account shares the demo password "handoff123".
+# DEMO ONLY: demo accounts share the demo password "handoff123", except
+# the clinical reviewer's individual UAT credential on this branch.
 # Passwords are stored hashed, never in plain text. Production use requires
 # real per-user credentials managed outside the codebase.
 
 DEMO_PASSWORD = "handoff123"
+UAT_REVIEWER_PASSWORD = "NinaUAT2026!"
 
 class User(UserMixin):
     def __init__(self, user_id, username, name, role_id, password_hash):
@@ -74,13 +76,13 @@ class User(UserMixin):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-def _make_user(user_id, username, name, role_id):
-    return User(user_id, username, name, role_id, generate_password_hash(DEMO_PASSWORD))
+def _make_user(user_id, username, name, role_id, password=DEMO_PASSWORD):
+    return User(user_id, username, name, role_id, generate_password_hash(password))
 
 USERS = {
     "1": _make_user("1", "dcarter", "Dr. Carter", "1"),
     "2": _make_user("2", "dwilliams", "Dr. Williams", "2"),
-    "3": _make_user("3", "njohnson", "Nina Johnson", "8"),
+    "3": _make_user("3", "njohnson", "Nina Johnson", "8", password=UAT_REVIEWER_PASSWORD),
     "4": _make_user("4", "nthompson", "Nurse Thompson", "4"),
     "5": _make_user("5", "amorgan", "Alex Morgan", "5"),
     "6": _make_user("6", "jlee", "Jordan Lee", "6"),
@@ -178,6 +180,9 @@ def load_care():
     data.setdefault("members_removed", {})
     data.setdefault("follows", [])
     data.setdefault("read_state", {})
+    data.setdefault("dispositions", {})
+    data.setdefault("notifications", [])
+    data.setdefault("notif_state", {})
     return data
 
 def save_care(care):
@@ -226,12 +231,18 @@ def all_patients(handoffs):
                 "patient_name": h.get("patient_name", ""),
                 "age": h.get("age"),
                 "sex": h.get("sex"),
+                "dob": None,
+                "mrn": None,
+                "fin": None,
                 "context": "",
                 "tasks": [],
             }
             patients[cid] = p
         if not p["context"] and h.get("patient_context"):
             p["context"] = h["patient_context"]
+        for _k in ("dob", "mrn", "fin"):
+            if not p[_k] and h.get(_k):
+                p[_k] = h[_k]
         p["tasks"].append(h)
     return patients
 
@@ -397,6 +408,10 @@ if os.environ.get("HANDOFF_SEED_DEMO") == "1" and not load_handoffs():
     from seed_demo import build_seed_handoffs
     save_handoffs(build_seed_handoffs())
 
+if os.environ.get("HANDOFF_SEED_DEMO") == "1" and not os.path.exists(care_file()):
+    from seed_demo import build_seed_care
+    save_care(build_seed_care())
+
 # -----------------------------
 # Auth routes
 # -----------------------------
@@ -544,6 +559,19 @@ def completion_stats(tasks):
         stats["max"] = round(durations[-1])
     return stats
 
+def identifier_match(ident, needle):
+    """Match a search string against DOB / MRN / FIN: full-string for the
+    DOB as typed (MM/DD/YYYY), digit-substring for MRN/FIN and for the
+    DOB's digits in either MMDDYYYY or YYYYMMDD order."""
+    digits = "".join(ch for ch in (needle or "") if ch.isdigit())
+    if len(digits) < 4:
+        return False
+    dob_digits = "".join(ch for ch in (ident.get("dob") or "") if ch.isdigit())
+    iso = dob_digits[4:] + dob_digits[:4] if len(dob_digits) == 8 else ""
+    return (digits in (ident.get("mrn") or "")
+            or digits in (ident.get("fin") or "")
+            or digits in dob_digits or digits in iso)
+
 def build_worklist(handoffs, care, user, meta, q="", active_filter=None, unit_scope=False):
     """Shared view-model for Screen 1 and its refresh fragment.
 
@@ -564,14 +592,15 @@ def build_worklist(handoffs, care, user, meta, q="", active_filter=None, unit_sc
     if q:
         needle = q.lower()
         def matches(p):
-            fields = [p.get("patient_name", ""), p.get("case_id", ""), p.get("context", "")]
+            fields = [p.get("patient_name", ""), p.get("case_id", ""), p.get("context", ""),
+                      p.get("dob", "") or "", p.get("mrn", "") or "", p.get("fin", "") or ""]
             fields += [h.get("event", "") for h in p["tasks"]]
             for h in p["tasks"]:
                 for key in ("owner", "initiator"):
                     m = meta.get(str(h.get(key)))
                     if m:
                         fields += [m["name"], m["role"]]
-            return any(needle in str(f).lower() for f in fields)
+            return identifier_match(p, needle) or any(needle in str(f).lower() for f in fields)
         summaries = [p for p in summaries if matches(p)]
     authorized = [p for p in summaries if p["can_view"]]
     ctx = {
@@ -637,6 +666,7 @@ def index():
         user_meta=meta,
         q=q,
         total_count=len(all_patients(handoffs)),
+        notif_unread=notif_unread_count(current_user, handoffs, care, meta),
         state_version=version,
         section_labels=SECTION_LABELS,
         filter_labels=FILTER_LABELS,
@@ -684,12 +714,13 @@ def board():
     if q:
         needle = q.lower()
         def matches(h):
-            fields = [h.get("patient_name", ""), h.get("case_id", ""), h.get("event", "")]
+            fields = [h.get("patient_name", ""), h.get("case_id", ""), h.get("event", ""),
+                      h.get("dob", "") or "", h.get("mrn", "") or "", h.get("fin", "") or ""]
             for key in ("owner", "initiator"):
                 m = meta.get(str(h.get(key)))
                 if m:
                     fields += [m["name"], m["role"]]
-            return any(needle in str(f).lower() for f in fields)
+            return identifier_match(h, needle) or any(needle in str(f).lower() for f in fields)
         handoffs = [h for h in all_handoffs if matches(h)]
     can_drill = unit_wide_access(current_user)
     board_filter = (request.args.get("filter") or "").upper() or None
@@ -704,6 +735,7 @@ def board():
     kwargs = dict(handoffs=handoffs, roles=display_roles(), users=USERS,
                   metrics=metrics, user_meta=meta, q=q, total_count=len(all_handoffs),
                   user=str(current_user.id), can_drill=can_drill,
+                  notif_unread=notif_unread_count(current_user, raw, care, meta),
                   board_filter=board_filter, section_labels=SECTION_LABELS,
                   filter_labels=FILTER_LABELS)
     kwargs.update(ctx)  # unit-scope ctx metrics are the board's own numbers
@@ -748,6 +780,7 @@ def build_patient_view(handoffs, care, user, case_id, meta):
         "strip": patient_section_statuses(tasks, meta),
         "members": members,
         "latest": patient_latest(tasks, meta),
+        "disposition": enrich_disposition(care, case_id, meta),
         "is_following": str(case_id) in followed_case_ids(care, user.id),
         "can_manage_team": str(user.role_id) in ORG_WIDE_ROLES,
     }
@@ -782,6 +815,7 @@ def patient_page(case_id):
         active_section=section,
         section_labels=SECTION_LABELS,
         sections=SECTIONS,
+        notif_unread=notif_unread_count(current_user, handoffs, care, meta),
         state_version=version,
     )
 
@@ -825,6 +859,141 @@ def api_state():
         "unread": {p["case_id"]: p["unread"] for p in authorized},
         "patients": len(authorized),
     }
+
+# -----------------------------
+# Disposition & responsibility transfer (Directive 3.0)
+# -----------------------------
+# A patient's disposition is staged, never a single label: intent,
+# order placement, acceptance, and completed disposition are separate
+# facts with their own attribution. The current responsible clinician is
+# a distinct record — a bed request or an acceptance NEVER moves it.
+# Responsibility transfers only at sign-off, and sign-off requires a
+# recorded acceptance (the institution-approved transfer criteria this
+# build can enforce; the criteria themselves remain hospital policy).
+
+def add_notification(care, case_id, kind, text, by_user, ack_required=False):
+    care["notifications"].append({
+        "id": new_handoff_id(),
+        "case_id": str(case_id),
+        "kind": kind,
+        "text": text,
+        "by": str(by_user),
+        "at": now_iso(),
+        "ack_required": bool(ack_required),
+    })
+
+def _who(meta, uid):
+    m = meta.get(str(uid)) if uid is not None else None
+    return f"{m['name']} · {m['role']}" if m else None
+
+def enrich_disposition(care, case_id, meta):
+    d = care["dispositions"].get(str(case_id))
+    if not d:
+        return None
+    ir = d.get("intent_recorded")
+    stages = [{
+        "label": "Intent recorded \u2014 " + ("Intent to admit" if d.get("intent") == "ADMIT" else "Intent to discharge"),
+        "state": "done" if ir else "current",
+        "detail": (f"Intended service: {d.get('service', '')}" + (f" \u00b7 By {_who(meta, ir['by'])} \u00b7 {ir['at']}" if ir else "")),
+    }]
+    if d.get("intent") == "ADMIT":
+        op = d.get("order_placed")
+        stages.append({
+            "label": "Order placement \u2014 admission order / bed request recorded",
+            "state": "done" if op else ("current" if ir else "pending"),
+            "detail": (f"By {_who(meta, op['by'])}" + (f" \u00b7 Entered by {_who(meta, op.get('entered_by'))}" if op.get("entered_by") else "") + f" \u00b7 {op['at']}") if op else "Not yet recorded",
+        })
+        ac = d.get("acceptance")
+        stages.append({
+            "label": "Receiving service acceptance",
+            "state": "done" if ac else ("current" if op else "pending"),
+            "detail": (f"Accepted by {ac.get('acceptor_label', '')}" + (f" \u00b7 Recorded by {_who(meta, ac.get('recorded_by'))}" if ac.get("recorded_by") else "") + f" \u00b7 {ac['at']}") if ac else "Pending",
+        })
+    co = d.get("completed")
+    stages.append({
+        "label": "Completed disposition \u2014 responsibility transferred at sign-off" if d.get("intent") == "ADMIT" else "Completed disposition \u2014 discharge completed",
+        "state": "done" if co else "pending",
+        "detail": (f"Signed off by {_who(meta, co.get('signed_off_by'))}" + (f" \u00b7 Responsibility accepted by {_who(meta, co.get('accepted_by'))}" if co.get("accepted_by") else "") + f" \u00b7 {co['at']}") if co else "Not completed",
+    })
+    return {"record": d, "stages": stages,
+            "responsible_label": _who(meta, d.get("responsible")),
+            "receiving": d.get("service")}
+
+# -----------------------------
+# Notifications Center (Directive 3.0)
+# -----------------------------
+# One feed per clinician: stored disposition/transfer notifications plus
+# the meaningful events on their authorized patients' histories. States
+# are kept separate: unread \u2260 read \u2260 acknowledged. Viewing never
+# counts as acknowledgment.
+
+DERIVED_NOTIF_KINDS = {
+    "STATUS_CHANGED_TO_ESCALATED": ("Task escalated", True),
+    "RECORD_ADDED": ("New record", False),
+    "STATUS_CHANGED_TO_COMPLETED": ("Task completed", False),
+    "HANDOFF_CANCELED": ("Handoff canceled", False),
+}
+STORED_NOTIF_LABELS = {
+    "BED_REQUEST": "Admission order \u2014 bed request",
+    "DISPOSITION_INTENT": "Disposition intent recorded",
+    "ACCEPTANCE": "Receiving acceptance recorded",
+    "TRANSFER_COMPLETE": "Responsibility transferred \u2014 sign-off complete",
+    "DISCHARGE_COMPLETE": "Discharge completed",
+}
+
+def notification_feed(user, handoffs, care, meta):
+    items = []
+    patients = all_patients(handoffs)
+    for n in care["notifications"]:
+        cid = str(n.get("case_id"))
+        if str(n.get("by")) == str(user.id):
+            continue
+        if cid in patients and can_view_patient(user, handoffs, care, cid):
+            items.append({
+                "key": "n:" + n["id"], "kind": n.get("kind"),
+                "label": STORED_NOTIF_LABELS.get(n.get("kind"), n.get("kind", "Notification")),
+                "case_id": cid, "patient_name": patients[cid]["patient_name"],
+                "text": n.get("text", ""), "by": n.get("by"), "at": n.get("at", ""),
+                "ack_required": bool(n.get("ack_required")),
+            })
+    for cid, p in patients.items():
+        if not can_view_patient(user, handoffs, care, cid):
+            continue
+        for h in p["tasks"]:
+            for e in h.get("history", []):
+                actor = event_actor(e)
+                if actor is not None and str(actor) == str(user.id):
+                    continue
+                ev = e.get("event")
+                kind = label = None
+                ack = False
+                if ev in DERIVED_NOTIF_KINDS:
+                    kind, label, ack = ev, DERIVED_NOTIF_KINDS[ev][0], DERIVED_NOTIF_KINDS[ev][1]
+                elif ev == "OWNERSHIP_TRANSFERRED" and actor is not None:
+                    if str(actor) == str(user.id):
+                        kind, label, ack = ev, "Baton received", True
+                    else:
+                        kind, label = ev, "Baton moved"
+                elif ev == "CREATED" and str(h.get("owner")) == str(user.id):
+                    kind, label, ack = ev, "New assignment", True
+                if not kind:
+                    continue
+                items.append({
+                    "key": f"h:{h['handoff_id']}:{ev}:{e.get('at', '')}",
+                    "kind": kind, "label": label,
+                    "case_id": cid, "patient_name": p["patient_name"],
+                    "text": event_line(e, h, meta), "by": actor, "at": e.get("at", ""),
+                    "ack_required": ack,
+                })
+    state = care["notif_state"].get(str(user.id), {"read": [], "ack": []})
+    for it in items:
+        it["read"] = it["key"] in state.get("read", [])
+        it["acked"] = it["key"] in state.get("ack", [])
+    items.sort(key=lambda x: x.get("at", ""), reverse=True)
+    return items[:40]
+
+def notif_unread_count(user, handoffs, care, meta):
+    return sum(1 for it in notification_feed(user, handoffs, care, meta) if not it["read"])
 
 # -----------------------------
 # Follow / care-team management
@@ -910,6 +1079,184 @@ def team_remove():
     if is_self:
         return redirect(url_for("index"))
     return redirect(url_for("patient_page", case_id=case_id))
+
+# -----------------------------
+# Disposition actions (Directive 3.0)
+# -----------------------------
+
+def _disposition_guard(case_id):
+    """Shared checks for disposition actions. Returns (handoffs, care,
+    record) or an error response tuple via _DispError."""
+    handoffs = load_handoffs()
+    care = load_care()
+    if str(case_id) not in all_patients(handoffs):
+        return None, None, ("Patient not found", 404)
+    if not can_view_patient(current_user, handoffs, care, case_id):
+        return None, None, ("Unauthorized: you are not on this patient's care team", 403)
+    return handoffs, care, care["dispositions"].get(str(case_id))
+
+@app.route("/disposition/intent", methods=["POST"])
+@login_required
+def disposition_intent():
+    case_id = str(request.form.get("case_id") or "")
+    intent = (request.form.get("intent") or "").upper()
+    service = (request.form.get("service") or "").strip()
+    handoffs, care, record = _disposition_guard(case_id)
+    if handoffs is None:
+        return record
+    if intent not in ("ADMIT", "DISCHARGE"):
+        return "Invalid disposition intent", 400
+    if not service:
+        return "The intended service or destination is required", 400
+    if record and record.get("completed"):
+        return "This disposition is already completed", 400
+    ts = now_iso()
+    if record is None:
+        record = {"intent": intent, "service": service,
+                  "intent_recorded": {"by": str(current_user.id), "at": ts},
+                  "order_placed": None, "acceptance": None, "completed": None,
+                  "responsible": str(current_user.id)}
+        care["dispositions"][case_id] = record
+    else:
+        record["intent"] = intent
+        record["service"] = service
+        record["intent_recorded"] = {"by": str(current_user.id), "at": ts}
+        if not record.get("responsible"):
+            record["responsible"] = str(current_user.id)
+    add_notification(care, case_id, "DISPOSITION_INTENT",
+                     f"{'Intent to admit' if intent == 'ADMIT' else 'Intent to discharge'} recorded \u2014 {service}.",
+                     current_user.id)
+    save_care(care)
+    flash("Disposition intent recorded.")
+    return redirect(url_for("patient_page", case_id=case_id))
+
+@app.route("/disposition/bed-request", methods=["POST"])
+@login_required
+def disposition_bed_request():
+    case_id = str(request.form.get("case_id") or "")
+    handoffs, care, record = _disposition_guard(case_id)
+    if handoffs is None:
+        return record
+    if not record or record.get("intent") != "ADMIT":
+        return "A bed request requires a recorded Intent to admit", 400
+    if record.get("order_placed"):
+        return "A bed request is already recorded for this patient", 400
+    record["order_placed"] = {"by": str(current_user.id), "entered_by": None, "at": now_iso()}
+    # The rule, enforced: recording a bed request does NOT change who is
+    # responsible for this patient.
+    add_notification(care, case_id, "BED_REQUEST",
+                     f"Admission order recorded \u2014 bed request (bed-slip) for {record.get('service', '')}. A bed request does not transfer responsibility.",
+                     current_user.id, ack_required=True)
+    save_care(care)
+    flash("Bed request recorded. Responsibility remains with the current responsible clinician.")
+    return redirect(url_for("patient_page", case_id=case_id))
+
+@app.route("/disposition/acceptance", methods=["POST"])
+@login_required
+def disposition_acceptance():
+    case_id = str(request.form.get("case_id") or "")
+    acceptor = (request.form.get("acceptor_label") or "").strip()
+    service = (request.form.get("service") or "").strip()
+    handoffs, care, record = _disposition_guard(case_id)
+    if handoffs is None:
+        return record
+    if not record or record.get("intent") != "ADMIT" or not record.get("order_placed"):
+        return "Acceptance requires a recorded bed request first", 400
+    if record.get("acceptance"):
+        return "Acceptance is already recorded for this patient", 400
+    if not acceptor:
+        return "Name who accepted (clinician or service admissions)", 400
+    record["acceptance"] = {"recorded_by": str(current_user.id), "acceptor_label": acceptor,
+                            "service": service or record.get("service", ""), "at": now_iso()}
+    add_notification(care, case_id, "ACCEPTANCE",
+                     f"Receiving acceptance recorded \u2014 {acceptor} ({service or record.get('service', '')}). Sign-off still pending; responsibility has not transferred.",
+                     current_user.id)
+    save_care(care)
+    flash("Acceptance recorded. Responsibility still has not transferred \u2014 sign-off is the transfer point.")
+    return redirect(url_for("patient_page", case_id=case_id))
+
+@app.route("/disposition/sign-off", methods=["POST"])
+@login_required
+def disposition_sign_off():
+    case_id = str(request.form.get("case_id") or "")
+    new_responsible = str(request.form.get("new_responsible") or "")
+    handoffs, care, record = _disposition_guard(case_id)
+    if handoffs is None:
+        return record
+    if not record or record.get("intent") != "ADMIT":
+        return "Sign-off applies to an Intent to admit disposition", 400
+    if not record.get("acceptance"):
+        return "Sign-off requires a recorded receiving acceptance \u2014 responsibility cannot transfer before acceptance", 400
+    if record.get("completed"):
+        return "This disposition is already completed", 400
+    if str(current_user.id) != str(record.get("responsible")) and str(current_user.role_id) not in ORG_WIDE_ROLES:
+        return "Only the current responsible clinician (or a charge nurse / care coordinator) can sign off", 403
+    if new_responsible not in USERS:
+        return "Choose the clinician accepting responsibility", 400
+    record["completed"] = {"signed_off_by": str(current_user.id), "accepted_by": new_responsible, "at": now_iso()}
+    record["responsible"] = new_responsible
+    add_notification(care, case_id, "TRANSFER_COMPLETE",
+                     "Responsibility transferred at sign-off under institution-approved transfer criteria.",
+                     current_user.id, ack_required=True)
+    save_care(care)
+    flash("Sign-off complete \u2014 responsibility has transferred and the transfer is on the record.")
+    return redirect(url_for("patient_page", case_id=case_id))
+
+@app.route("/disposition/complete", methods=["POST"])
+@login_required
+def disposition_complete():
+    case_id = str(request.form.get("case_id") or "")
+    handoffs, care, record = _disposition_guard(case_id)
+    if handoffs is None:
+        return record
+    if not record or record.get("intent") != "DISCHARGE":
+        return "This completion applies to an Intent to discharge disposition", 400
+    if record.get("completed"):
+        return "This disposition is already completed", 400
+    if str(current_user.id) != str(record.get("responsible")) and str(current_user.role_id) not in ORG_WIDE_ROLES:
+        return "Only the current responsible clinician (or a charge nurse / care coordinator) can complete the discharge", 403
+    record["completed"] = {"signed_off_by": str(current_user.id), "accepted_by": None, "at": now_iso()}
+    add_notification(care, case_id, "DISCHARGE_COMPLETE",
+                     "Discharge completed and recorded by the responsible clinician.",
+                     current_user.id)
+    save_care(care)
+    flash("Discharge completed and recorded.")
+    return redirect(url_for("patient_page", case_id=case_id))
+
+# -----------------------------
+# Notifications Center routes
+# -----------------------------
+
+@app.route("/notifications")
+@login_required
+def notifications_page():
+    handoffs = load_handoffs()
+    care = load_care()
+    meta = user_meta()
+    items = notification_feed(current_user, handoffs, care, meta)
+    # Opening the center marks items read \u2014 read is not acknowledgment;
+    # ack-required items keep their Acknowledge button until acked.
+    state = care["notif_state"].setdefault(str(current_user.id), {"read": [], "ack": []})
+    read_set = set(state.get("read", []))
+    for it in items:
+        read_set.add(it["key"])
+    state["read"] = sorted(read_set)
+    save_care(care)
+    return render_template("notifications.html", items=items, user_meta=meta,
+                           roles=display_roles(), users=USERS)
+
+@app.route("/notifications/ack", methods=["POST"])
+@login_required
+def notifications_ack():
+    key = (request.form.get("key") or "").strip()
+    care = load_care()
+    state = care["notif_state"].setdefault(str(current_user.id), {"read": [], "ack": []})
+    ack_set = set(state.get("ack", []))
+    if key:
+        ack_set.add(key)
+    state["ack"] = sorted(ack_set)
+    save_care(care)
+    return redirect(url_for("notifications_page"))
 
 # -----------------------------
 # Create a handoff
@@ -1059,13 +1406,34 @@ def update_status():
     if not can_change_status(old_status, new_status):
         return f"Invalid status transition: {old_status} -> {new_status}", 400
 
+    # Itemized completion (Directive 3.0): a task is never just "Completed".
+    # Completing requires a documented outcome, and the record keeps what
+    # was completed, who completed it (with role), when, and the outcome.
+    # Completing a task never changes the patient's disposition.
+    outcome = None
+    if new_status == "COMPLETED":
+        outcome = (request.form.get("outcome") or "").strip()
+        if not outcome:
+            return "A documented outcome is required to complete a handoff", 400
+        if len(outcome) > 500:
+            return "Outcome too long (500 characters max)", 400
+
     target["status"] = new_status
     target["updated_at"] = now_iso()
-    target["history"].append({
+    event = {
         "at": target["updated_at"],
         "event": f"STATUS_CHANGED_TO_{new_status}",
         "by": int(current_user.id),
-    })
+    }
+    if outcome is not None:
+        event["outcome"] = outcome
+        target["completion"] = {
+            "by": int(current_user.id),
+            "role": current_user.role_name,
+            "at": target["updated_at"],
+            "outcome": outcome,
+        }
+    target["history"].append(event)
 
     save_handoffs(handoffs)
     return redirect(url_for("index"))
@@ -1199,6 +1567,12 @@ def add_note():
     if not can_view_patient(current_user, handoffs, load_care(), target.get("case_id")):
         return "You are not on this patient's care team", 403
 
+    # Two-identifier rule (Directive 3.0): documenting care requires the
+    # clinician to confirm two patient identifiers — name plus DOB/MRN —
+    # for THIS patient. Enforced here, server-side, on every record entry.
+    if request.form.get("id_confirm_name") != "on" or request.form.get("id_confirm_dob") != "on":
+        return "Two patient identifiers must be confirmed before documenting care", 400
+
     ts = now_iso()
     target["history"].append({
         "at": ts,
@@ -1207,6 +1581,7 @@ def add_note():
         "category": category,
         "text": text,
         "by": int(current_user.id),
+        "id_confirmed": True,
     })
     target["updated_at"] = ts
 

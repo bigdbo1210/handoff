@@ -59,6 +59,8 @@ def fresh_board():
 
 
 def login(username, password="handoff123"):
+    if username == "njohnson" and password == "handoff123":
+        password = "NinaUAT2026!"  # reviewer holds an individual UAT credential on this branch
     client = handoff_app.app.test_client()
     resp = client.post("/login", data={"username": username, "password": password})
     return client, resp
@@ -102,7 +104,7 @@ def main():
         check(f"{username} is {name}", user.name == name and user.username == username)
         check(f"{username} role is {role}", user.role_name == role)
         client, resp = login(username)
-        check(f"{username} signs in with handoff123", resp.status_code == 302)
+        check(f"{username} signs in", resp.status_code == 302)
         client.get("/logout")
 
     print("== Login page lists all eight demo accounts ==")
@@ -112,7 +114,7 @@ def main():
         check(f"login page lists {username}", username in page)
 
     print("== Transfer dropdown contains the whole team ==")
-    client, _ = login("njohnson")
+    client, _ = login("njohnson", "NinaUAT2026!")
     card = card_for(client)
     values = dropdown_values(card)
     expected = sorted(uid for uid, *_ in ROSTER if uid != "3")
@@ -146,7 +148,7 @@ def main():
     print("== Non-owner rights: contribute yes, transfer no ==")
     client, _ = login("jlee")
     resp = client.post("/add-note", data={"handoff_id": hid, "note_type": "NOTE",
-                                          "text": "Chain test: coordinator note."})
+                                          "text": "Chain test: coordinator note.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("non-owner can add to the record", resp.status_code == 302)
     resp = client.post("/transfer-owner", data={"handoff_id": hid, "new_owner": "6"})
     check("non-owner transfer is refused (403)", resp.status_code == 403)

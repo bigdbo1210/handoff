@@ -16,7 +16,7 @@
         {% for item in data.records|reverse %}
         <div class="rec-entry">
             <div class="rec-text">{{ item.text }}</div>
-            <div class="rec-meta">Recorded by {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span> · Entered manually</div>
+            <div class="rec-meta">Recorded by {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span> · Entered manually{% if item.get('id_confirmed') %} · Two patient identifiers confirmed{% endif %}</div>
         </div>
         {% endfor %}
         {% for h in data.tasks %}
@@ -44,11 +44,20 @@
     {% set closed = p.tasks|selectattr("status", "in", ["COMPLETED", "CANCELED"])|list %}
     {% if closed %}
     <h4 class="pane-subtitle">Closed tasks</h4>
+    <p class="pane-note">A completed task always names what was completed, who completed it, when, and the documented outcome. Completing a task does not change the patient's disposition — see Disposition &amp; Responsibility above.</p>
     {% for h in closed %}
+    {% if h.status == "COMPLETED" and h.get('completion') %}
+    <div class="rec-entry">
+        <div class="rec-text"><strong>Completed — {{ h.event }}</strong></div>
+        <div class="rec-meta">Completed by {{ user_meta.get(h.completion.by|string).name if user_meta.get(h.completion.by|string) else "Unknown" }} · {{ h.completion.role }} · <span class="time" data-time="{{ h.completion.at }}">just now</span></div>
+        <div class="rec-text" style="margin-top:4px"><strong>Documented outcome:</strong> {{ h.completion.outcome }}</div>
+    </div>
+    {% else %}
     <div class="task-line">
         <span class="task-line-main"><strong>{{ h.event }}</strong> — {{ h.status.replace("_", " ").title() }}</span>
         <span class="task-line-owner">Last baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}</span>
     </div>
+    {% endif %}
     {% endfor %}
     {% endif %}
 

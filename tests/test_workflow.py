@@ -39,6 +39,8 @@ def load():
     return json.load(open(_tmp.name))
 
 def login(client, username, password="handoff123"):
+    if username == "njohnson" and password == "handoff123":
+        password = "NinaUAT2026!"  # reviewer holds an individual UAT credential on this branch
     return client.post("/login", data={"username": username, "password": password})
 
 # ---------- Auth ----------
@@ -51,7 +53,7 @@ r2 = anon.get("/")
 check("Wrong password does not log in", r2.status_code == 302, f"status={r2.status_code}")
 
 rn = handoff_app.app.test_client()
-login(rn, "njohnson")
+login(rn, "njohnson", "NinaUAT2026!")
 r = rn.get("/")
 check("RN logs in and sees dashboard", r.status_code == 200, f"status={r.status_code}")
 check("Dashboard shows 4 status columns", all(s in r.get_data(as_text=True) for s in ["NEW", "IN PROGRESS", "ESCALATED", "COMPLETED"]))
@@ -98,11 +100,11 @@ check("History shows transfer 3 -> 6", any(e["event"] == "OWNERSHIP_TRANSFERRED"
 # must be on the care team before he can contribute to the record.
 resident = handoff_app.app.test_client()
 login(resident, "dwilliams")
-r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "ORDER", "text": "Repeat troponin in 3 hours."})
+r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "ORDER", "text": "Repeat troponin in 3 hours.", "id_confirm_name": "on", "id_confirm_dob": "on"})
 check("Contribution before team membership -> 403", r.status_code == 403, f"status={r.status_code}")
 r = rn.post("/team/add", data={"case_id": "A44219", "user_id": "2"})
 check("A team member adds the Resident to the care team", r.status_code == 302, f"status={r.status_code}")
-r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "ORDER", "text": "Repeat troponin in 3 hours."})
+r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "ORDER", "text": "Repeat troponin in 3 hours.", "id_confirm_name": "on", "id_confirm_dob": "on"})
 check("Non-owner team member can add an ORDER to the record", r.status_code == 302, f"status={r.status_code}")
 h = [x for x in load() if x["handoff_id"] == hid][0]
 rec = [e for e in h["history"] if e["event"] == "RECORD_ADDED"]
@@ -125,13 +127,13 @@ coord = handoff_app.app.test_client()
 login(coord, "jlee")
 r = coord.post("/update-status", data={"handoff_id": hid, "status": "ESCALATED"})
 check("Owner IN_PROGRESS -> ESCALATED", r.status_code == 302, f"status={r.status_code}")
-r = coord.post("/update-status", data={"handoff_id": hid, "status": "COMPLETED"})
+r = coord.post("/update-status", data={"handoff_id": hid, "status": "COMPLETED", "outcome": "Care coordination complete \u2014 receiving team confirmed."})
 check("Owner ESCALATED -> COMPLETED", r.status_code == 302, f"status={r.status_code}")
 r = coord.post("/transfer-owner", data={"handoff_id": hid, "new_owner": "2"})
 check("Transfer of COMPLETED -> 400", r.status_code == 400, f"status={r.status_code}")
 
 # A late record entry can still be added to a completed handoff (late charting is real)
-r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "NOTE", "text": "Late entry: family notified of result."})
+r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "NOTE", "text": "Late entry: family notified of result.", "id_confirm_name": "on", "id_confirm_dob": "on"})
 check("Record can be added to COMPLETED handoff", r.status_code == 302, f"status={r.status_code}")
 
 # ---------- Logout ----------

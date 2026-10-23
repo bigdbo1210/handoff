@@ -40,7 +40,7 @@ def check(label, condition):
 
 def login(username):
     client = handoff_app.app.test_client()
-    resp = client.post("/login", data={"username": username, "password": "handoff123"})
+    resp = client.post("/login", data={"username": username, "password": "NinaUAT2026!" if username == "njohnson" else "handoff123"})
     assert resp.status_code == 302, username
     return client
 
@@ -66,7 +66,7 @@ def main():
 
     r = williams.post("/add-note", data={
         "handoff_id": hid, "note_type": "UPDATE", "category": "LAB",
-        "text": "Troponin resulted: 0.04 — within normal limits."})
+        "text": "Troponin resulted: 0.04 — within normal limits.", "id_confirm_name": "on", "id_confirm_dob": "on"})
     check("teammate's contribution is accepted (302)", r.status_code == 302)
     h = handoff_app.find_handoff(handoff_app.load_handoffs(), hid)
     check("the baton did not move", h["owner"] == 3 and h["status"] == "IN_PROGRESS")

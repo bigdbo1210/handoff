@@ -33,7 +33,7 @@ def check(label, condition):
 
 def login(username):
     client = handoff_app.app.test_client()
-    resp = client.post("/login", data={"username": username, "password": "handoff123"})
+    resp = client.post("/login", data={"username": username, "password": "NinaUAT2026!" if username == "njohnson" else "handoff123"})
     assert resp.status_code == 302, username
     return client
 

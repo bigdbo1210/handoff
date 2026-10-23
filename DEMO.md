@@ -175,3 +175,36 @@ Approved by Derrick D. Dennis after the Operations Board scope review.
   then added to the team, then contributes. The checks' intent
   (non-owners can document; late entries land on completed handoffs)
   is preserved. New coverage: `tests/test_contribution_auth.py`.
+
+## Clinical UAT build (branch uat-nina, Directive 3.0)
+
+A separate evaluation deployment of the full application. The public demo
+(handoff-demo, branch main) is unchanged.
+
+Reviewer login (individual credential for this build):
+- Username: njohnson — Password: NinaUAT2026!
+All other demo accounts keep the shared demo password above.
+
+Working in this build, on top of everything in the public demo:
+- Search by name, DOB (MM/DD/YYYY), MRN, or FIN; identifiers are shown on
+  the roster and in every patient workspace header.
+- Documenting care requires confirming two patient identifiers (name +
+  DOB/MRN) — enforced by the server; the entry records the confirmation.
+- Completing a task requires a documented outcome; completions are
+  itemized (task, clinician + role, time, outcome) and never change the
+  patient's disposition.
+- Disposition & Responsibility panel per patient: Intent to admit /
+  Intent to discharge, order placement (bed request), receiving
+  acceptance, and completed disposition as separate attributed stages.
+  A bed request or acceptance never transfers responsibility; only the
+  responsible clinician's sign-off does, and only after acceptance.
+- Notifications Center: meaningful activity on your patients, with
+  acknowledgment tracked separately from reading.
+- Seeded walkthroughs: JOHNSON, M (A44219) — Intent to admit, Cardiology,
+  bed request recorded, acceptance pending, Nina responsible. GARCIA, L
+  (B77102) — acceptance recorded, sign-off pending (view as jlee).
+
+Still simulated in this environment: data resets when the free service
+restarts; notifications live inside the app only (no device push); no EMR
+connection — entries are recorded manually by named clinicians; not for
+real patient data.

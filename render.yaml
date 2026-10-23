@@ -1,9 +1,12 @@
-# Render blueprint for the Handoff public demo.
+# Render blueprint for the Handoff UAT build (branch uat-nina).
+# This creates a SEPARATE service (handoff-uat); the public demo
+# service (handoff-demo, branch main) is untouched by this file.
 # Demo data is fictional and re-seeds itself on every cold start
 # (HANDOFF_SEED_DEMO=1), because the free plan's filesystem is ephemeral.
 services:
   - type: web
-    name: handoff-demo
+    name: handoff-uat
+    branch: uat-nina
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
