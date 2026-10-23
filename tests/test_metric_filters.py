@@ -41,8 +41,13 @@ def login(username):
     assert resp.status_code == 302, username
     return client
 
+# Directive 3.0 experience: the four status categories are navigation
+# chips on the roster; their counts are the same roster-task counts the
+# metric cards used to show.
+CHIP_LABELS = {"NEW": "New", "IN_PROGRESS": "In Progress", "ESCALATED": "Escalated", "COMPLETED": "Completed"}
+
 def metric_num(html, label):
-    m = re.search(r'<div class="num">(\d+)</div><div class="lbl">' + label, html)
+    m = re.search(CHIP_LABELS[label] + r' <span class="cat-count">(\d+)</span>', html)
     return int(m.group(1)) if m else None
 
 def blocks(html):
@@ -90,8 +95,11 @@ def main():
     check("COMPLETED shows the 3 finished patients",
           blocks(page) == 3 and all(n in page for n in ["BROWN, D", "DAVIS, S", "WALKER, N"]))
     page = thompson.get("/?filter=STALE").get_data(as_text=True)
-    check("WAITING TOO LONG surfaces the stale four",
-          all(n in page for n in ["SMITH, J", "GARCIA, L", "PATEL, R", "LEWIS, D"]))
+    check("the removed inactivity filter falls back to the plain roster",
+          "My Patients" in page)
+    check("the removed inactivity label appears nowhere (home, board, workspace)",
+          all("Waiting Too Long" not in c.get(p).get_data(as_text=True)
+              for c, p in [(thompson, "/"), (thompson, "/board"), (nina, "/patient/A44219")]))
 
     print("== AVERAGE COMPLETION opens a breakdown, not a filter ==")
     page = thompson.get("/?filter=COMPLETIONS").get_data(as_text=True)

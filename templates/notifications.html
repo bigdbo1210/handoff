@@ -27,6 +27,11 @@
         .chip.need { background: #fef7e0; color: #9a6a00; }
         button { background: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: bold; margin-top: 8px; }
         button:hover { background: #1765cc; }
+        .sim-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#fff; border:1px solid #e2e9f2; border-radius:10px; padding:12px 15px; margin-bottom:14px; box-shadow:0 1px 4px rgba(16,42,74,.07); font-size:13.5px; }
+        .sim-btn { background:#102a4a; margin-top:0; }
+        .sim-btn:hover { background:#17406e; }
+        .rec-link { color:#174ea6; font-weight:bold; text-decoration:none; }
+        .rec-link:hover { text-decoration:underline; }
         .empty { background: white; border: 1px solid #e2e9f2; border-radius: 10px; padding: 22px; text-align: center; color: #63758c; font-size: 14px; }
         .imprint { background: #0b1828; color: #9db8dd; text-align: center; padding: 15px 16px 17px; font-size: 12.5px; margin-top: 26px; }
         .imprint strong { color: white; }
@@ -40,17 +45,25 @@
     </div>
     <div class="wrap">
         <h1>Notifications Center</h1>
-        <p class="sub">Meaningful activity on your patients only. Viewing is not acknowledgment — alerts that require it keep their Acknowledge button until you confirm. Signed in as {{ current_user.name }}, {{ current_user.role_name }}.</p>
+        <p class="sub">Meaningful activity on your patients only. Viewing is not acknowledgment — alerts that require it keep their Acknowledge button until you confirm. Every alert links to the exact record it refers to. Signed in as {{ current_user.name }}, {{ current_user.role_name }}.</p>
+        <div class="sim-row">
+            <form method="POST" action="{{ url_for('notifications_simulate') }}" style="margin:0">
+                <button class="sim-btn" type="submit">Simulate incoming alert</button>
+            </form>
+            <span style="color:#5c6f87">Adds one clearly-labeled simulated alert for your most recently updated patient, so you can see exactly how a new alert arrives.</span>
+            <label style="margin-left:auto"><input type="checkbox" id="audible-toggle"> Audible alert for items needing acknowledgment (this device)</label>
+        </div>
         {% if items %}
             {% for n in items %}
             <div class="notif{% if not n.read %} unread{% endif %}">
                 <div class="n-head">
                     <span class="n-kind">{{ n.label }}</span>
-                    <a class="n-patient" href="{{ url_for('patient_page', case_id=n.case_id) }}">{{ n.patient_name }} · Case {{ n.case_id }}</a>
+                    <a class="n-patient" href="{{ url_for('patient_page', case_id=n.case_id, section=n.section, hl=n.hl) }}">{{ n.patient_name }} · Case {{ n.case_id }}</a>
                 </div>
                 <div class="n-text">{{ n.text }}</div>
                 <div class="n-meta">
                     {% set bm = user_meta.get(n.by|string) %}{{ bm.name if bm else "System" }}{% if bm %} · {{ bm.role }}{% endif %} · <span class="time" data-time="{{ n.at }}">{{ n.at }}</span>
+                    <a class="rec-link" href="{{ url_for('patient_page', case_id=n.case_id, section=n.section, hl=n.hl) }}">Open the exact record →</a>
                     {% if not n.read %}<span class="chip new">New</span>{% endif %}
                     {% if n.ack_required and n.acked %}<span class="chip ack">Acknowledged ✓</span>{% elif n.ack_required %}<span class="chip need">Acknowledgment required</span>{% endif %}
                 </div>
@@ -75,6 +88,23 @@ document.querySelectorAll('.time').forEach(el => {
         el.innerText = d < 1 ? "just now" : d < 60 ? d + " min ago" : d < 1440 ? Math.floor(d / 60) + " hr ago" : Math.floor(d / 1440) + " day(s) ago";
     }
 });
+</script>
+<script>
+(function () {
+    var box = document.getElementById('audible-toggle');
+    if (!box) return;
+    box.checked = localStorage.getItem('handoff_audible') === '1';
+    box.addEventListener('change', function () { localStorage.setItem('handoff_audible', box.checked ? '1' : '0'); });
+    if (box.checked && document.querySelector('.chip.need')) {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = 880; g.gain.value = 0.06;
+            o.start(); o.stop(ctx.currentTime + 0.18);
+        } catch (e) { /* audio unavailable on this device */ }
+    }
+})();
 </script>
 </body>
 </html>

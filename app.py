@@ -181,6 +181,7 @@ def load_care():
     data.setdefault("follows", [])
     data.setdefault("read_state", {})
     data.setdefault("dispositions", {})
+    data.setdefault("snapshots", {})
     data.setdefault("notifications", [])
     data.setdefault("notif_state", {})
     return data
@@ -196,6 +197,9 @@ def save_care(care):
 ORG_WIDE_ROLES = {"4", "6"}
 
 SECTIONS = ["LABS", "DIAGNOSTICS", "CONSULTS", "TASKS"]
+# The approved Directive 3.0 workspace: ten sections, one patient at a time.
+WORKSPACE_SECTIONS = ["OVERVIEW", "HPI", "MEDICAL_HISTORY", "VITALS", "LABS",
+                      "DIAGNOSTICS", "CONSULTS", "UPDATES", "TASKS", "HISTORY"]
 SECTION_LABELS = {
     "LABS": "Labs",
     "DIAGNOSTICS": "Diagnostics / Imaging",
@@ -453,15 +457,9 @@ def enrich(handoff):
     if updated:
         age_min = max(0, int((datetime.now(timezone.utc) - updated).total_seconds() // 60))
     handoff["age_minutes"] = age_min
-    status = handoff.get("status")
-    # A handoff that sits untouched is the invisible-work problem made
-    # visible: flag it amber, then red, the longer it waits.
-    if status == "ESCALATED":
-        handoff["stale_level"] = "red" if (age_min or 0) >= 60 else "amber" if (age_min or 0) >= 30 else ""
-    elif status in ("NEW", "IN_PROGRESS"):
-        handoff["stale_level"] = "red" if (age_min or 0) >= 240 else "amber" if (age_min or 0) >= 120 else ""
-    else:
-        handoff["stale_level"] = ""
+    # No automatic inactivity flags in this build (removal decision,
+    # 2026-10-23). The key stays for template compatibility, always "".
+    handoff["stale_level"] = ""
     return handoff
 
 def compute_metrics(handoffs):
@@ -515,13 +513,16 @@ def patient_summaries(handoffs, care, user, meta):
     out.sort(key=lambda p: (p["latest"] or {}).get("at", ""), reverse=True)
     return out
 
-STATUS_FILTERS = {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "STALE", "COMPLETIONS"}
+# The approved Directive 3.0 experience has exactly four status
+# categories. The inactivity / Tasks Overdue category was removed entirely by
+# Derrick + Nina's decision (2026-10-23): no stale filter, no inactivity
+# flags — elapsed time alone never marks a task.
+STATUS_FILTERS = {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS"}
 FILTER_LABELS = {
     "NEW": "New",
     "IN_PROGRESS": "In Progress",
     "ESCALATED": "Escalated",
     "COMPLETED": "Completed",
-    "STALE": "Waiting Too Long",
     "COMPLETIONS": "Completion Times",
 }
 
@@ -629,8 +630,6 @@ def build_worklist(handoffs, care, user, meta, q="", active_filter=None, unit_sc
         ]
     elif active_filter in STATUS_FILTERS:
         def task_matches(h):
-            if active_filter == "STALE":
-                return bool(h.get("stale_level"))
             return h.get("status") == active_filter
         total = 0
         for p in authorized_all:
@@ -781,6 +780,9 @@ def build_patient_view(handoffs, care, user, case_id, meta):
         "members": members,
         "latest": patient_latest(tasks, meta),
         "disposition": enrich_disposition(care, case_id, meta),
+        "snapshot": care["snapshots"].get(str(case_id)) or {},
+        "updates": [i for i in timeline if i["event"] == "RECORD_ADDED"],
+        "composer_task_id": (max(tasks, key=lambda h: h.get("updated_at", "")) or {}).get("handoff_id") if tasks else None,
         "is_following": str(case_id) in followed_case_ids(care, user.id),
         "can_manage_team": str(user.role_id) in ORG_WIDE_ROLES,
     }
@@ -800,11 +802,8 @@ def patient_page(case_id):
     mark_read(care, current_user.id, case_id, view["tasks"], meta)
     save_care(care)
     section = (request.args.get("section") or "").upper()
-    if section not in SECTIONS and section != "HISTORY":
-        section = "TASKS"
-        latest = view["latest"]
-        if latest and latest["section"] in ("LABS", "DIAGNOSTICS", "CONSULTS"):
-            section = latest["section"]
+    if section not in WORKSPACE_SECTIONS:
+        section = "OVERVIEW"
     version = state_version(handoffs, [str(case_id)], meta)
     return render_template(
         "patient.html",
@@ -814,7 +813,8 @@ def patient_page(case_id):
         user_meta=meta,
         active_section=section,
         section_labels=SECTION_LABELS,
-        sections=SECTIONS,
+        sections=WORKSPACE_SECTIONS,
+        hl=request.args.get("hl") or "",
         notif_unread=notif_unread_count(current_user, handoffs, care, meta),
         state_version=version,
     )
@@ -831,7 +831,7 @@ def fragment_patient(case_id):
         return "Unauthorized", 403
     view = build_patient_view(handoffs, care, current_user, case_id, meta)
     section = (request.args.get("section") or "TASKS").upper()
-    if section not in SECTIONS and section != "HISTORY":
+    if section not in WORKSPACE_SECTIONS:
         section = "TASKS"
     return render_template(
         "patient_sections.html",
@@ -841,7 +841,8 @@ def fragment_patient(case_id):
         user_meta=meta,
         active_section=section,
         section_labels=SECTION_LABELS,
-        sections=SECTIONS,
+        sections=WORKSPACE_SECTIONS,
+        hl=request.args.get("hl") or "",
     )
 
 @app.route("/api/state")
@@ -939,6 +940,7 @@ STORED_NOTIF_LABELS = {
     "ACCEPTANCE": "Receiving acceptance recorded",
     "TRANSFER_COMPLETE": "Responsibility transferred \u2014 sign-off complete",
     "DISCHARGE_COMPLETE": "Discharge completed",
+    "SIMULATION": "Simulated incoming alert",
 }
 
 def notification_feed(user, handoffs, care, meta):
@@ -955,6 +957,7 @@ def notification_feed(user, handoffs, care, meta):
                 "case_id": cid, "patient_name": patients[cid]["patient_name"],
                 "text": n.get("text", ""), "by": n.get("by"), "at": n.get("at", ""),
                 "ack_required": bool(n.get("ack_required")),
+                "section": n.get("section") or "OVERVIEW", "hl": n.get("hl") or "",
             })
     for cid, p in patients.items():
         if not can_view_patient(user, handoffs, care, cid):
@@ -978,12 +981,19 @@ def notification_feed(user, handoffs, care, meta):
                     kind, label, ack = ev, "New assignment", True
                 if not kind:
                     continue
+                if ev == "RECORD_ADDED":
+                    deep_section = event_section(e, h)
+                elif ev == "HANDOFF_CANCELED":
+                    deep_section = "HISTORY"
+                else:
+                    deep_section = "TASKS"
                 items.append({
                     "key": f"h:{h['handoff_id']}:{ev}:{e.get('at', '')}",
                     "kind": kind, "label": label,
                     "case_id": cid, "patient_name": p["patient_name"],
                     "text": event_line(e, h, meta), "by": actor, "at": e.get("at", ""),
                     "ack_required": ack,
+                    "section": deep_section, "hl": e.get("at", ""),
                 })
     state = care["notif_state"].get(str(user.id), {"read": [], "ack": []})
     for it in items:
@@ -1244,6 +1254,31 @@ def notifications_page():
     save_care(care)
     return render_template("notifications.html", items=items, user_meta=meta,
                            roles=display_roles(), users=USERS)
+
+@app.route("/notifications/simulate", methods=["POST"])
+@login_required
+def notifications_simulate():
+    """Inject one clearly-labeled simulated incoming alert for the
+    signed-in clinician (Directive 3.0 reviewer feature): it lands in the
+    Notifications Center like a real alert, deep-links to the patient's
+    latest record, and is marked SIMULATION everywhere it appears."""
+    handoffs = load_handoffs()
+    care = load_care()
+    meta = user_meta()
+    authorized = [p for p in patient_summaries(handoffs, care, current_user, meta) if p["can_view"]]
+    if not authorized:
+        flash("No authorized patients to simulate an update for.")
+        return redirect(url_for("notifications_page"))
+    p = authorized[0]
+    latest = p["latest"] or {}
+    add_notification(care, p["case_id"], "SIMULATION",
+                     f"SIMULATION \u2014 incoming update for {p['patient_name']}: {latest.get('line', 'new activity recorded')}",
+                     "0")
+    care["notifications"][-1]["section"] = latest.get("section", "TASKS")
+    care["notifications"][-1]["hl"] = latest.get("at", "")
+    save_care(care)
+    flash("Simulated incoming alert added to your Notifications Center.")
+    return redirect(url_for("notifications_page"))
 
 @app.route("/notifications/ack", methods=["POST"])
 @login_required

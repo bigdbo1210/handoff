@@ -62,12 +62,20 @@ def main():
     nina = login("njohnson")
     jlee = login("jlee")
 
-    print("== #2 All six cards work ==")
+    print("== #2 The four status categories work ==")
     home = thompson.get("/").get_data(as_text=True)
-    for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "STALE", "COMPLETIONS"]:
-        check(f"card links to ?filter={f}", f'href="/?filter={f}"' in home)
+    for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED"]:
+        check(f"category chip links to ?filter={f}", f'href="/?filter={f}"' in home)
         r = thompson.get(f"/?filter={f}")
         check(f"filter {f} renders 200", r.status_code == 200)
+    board = thompson.get("/board").get_data(as_text=True)
+    check("completion times stay reachable from the Operations Board",
+          'href="/board?filter=COMPLETIONS"' in board)
+    check("the removed inactivity category links from nowhere",
+          "filter=STALE" not in home and "filter=STALE" not in board
+          and "Waiting Too Long" not in home and "Waiting Too Long" not in board)
+    check("filter COMPLETIONS renders 200", thompson.get("/?filter=COMPLETIONS").status_code == 200)
+    check("filter STALE renders 200 (falls back to the roster)", thompson.get("/?filter=STALE").status_code == 200)
 
     print("== #3 Compact summaries, expandable tasks ==")
     page = thompson.get("/?filter=ESCALATED").get_data(as_text=True)
@@ -86,7 +94,7 @@ def main():
     print("== #4 Selecting a metric changes nothing clinical ==")
     before = snapshot()
     for client in (thompson, nina):
-        for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "STALE", "COMPLETIONS"]:
+        for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS"]:
             client.get(f"/?filter={f}")
             client.get(f"/fragments/worklist?filter={f}")
     check("statuses, owners, acknowledgments, history lengths identical",

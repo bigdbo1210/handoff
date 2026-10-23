@@ -67,11 +67,15 @@ def login(username, password="handoff123"):
 
 
 def card_for(client, case_id=CASE):
-    html = client.get("/").get_data(as_text=True)
+    # Directive 3.0 experience: task cards live in the patient's
+    # workspace (Pending Tasks), not on the roster home.
+    html = client.get(f"/patient/{case_id}?section=TASKS").get_data(as_text=True)
     # Split on card CONTAINERS only: class="card" or class="card stale-...",
     # not the inner card-head / card-case / card-meta divs.
     for chunk in re.split(r'(?=<div class="card[" ])', html):
-        if f"Case {case_id}" in chunk and "card-case" in chunk:
+        # Only a chunk that STARTS a card counts \u2014 page chrome (styles,
+        # headers) can contain the same strings on the workspace page.
+        if chunk.startswith('<div class="card') and f"Case {case_id}" in chunk and "card-case" in chunk:
             return chunk
     return ""
 

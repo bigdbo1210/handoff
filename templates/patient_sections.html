@@ -1,20 +1,135 @@
-{# Tab bar + section panes for Screen 2 — shared by the patient page and the refresh fragment. #}
-{% set tab_labels = {"LABS": "Labs", "DIAGNOSTICS": "Diagnostics / Imaging", "CONSULTS": "Consultations", "TASKS": "Pending Tasks", "HISTORY": "Accountability History"} %}
+{# Tab bar + section panes for Screen 2 — the approved Directive 3.0
+   workspace: ten sections, one patient at a time. Shared by the patient
+   page and the refresh fragment. #}
+{% set tab_labels = {"OVERVIEW": "Overview", "HPI": "HPI", "MEDICAL_HISTORY": "Medical History", "VITALS": "Vitals", "LABS": "Labs", "DIAGNOSTICS": "Diagnostics / Imaging", "CONSULTS": "Consultations", "UPDATES": "Care-Team Updates", "TASKS": "Pending Tasks", "HISTORY": "Activity & Accountability"} %}
 <div class="tabs" role="tablist">
-    {% for sec in ["LABS", "DIAGNOSTICS", "CONSULTS", "TASKS", "HISTORY"] %}
+    {% for sec in ["OVERVIEW", "HPI", "MEDICAL_HISTORY", "VITALS", "LABS", "DIAGNOSTICS", "CONSULTS", "UPDATES", "TASKS", "HISTORY"] %}
     <a class="tab{% if active_section == sec %} active{% endif %}" href="{{ url_for('patient_page', case_id=p.case_id, section=sec) }}">{{ tab_labels[sec] }}
         {% if sec == "TASKS" and p.open_tasks %}<span class="tab-count">{{ p.open_tasks|length }}</span>{% endif %}
+        {% if sec == "UPDATES" and p.updates %}<span class="tab-count">{{ p.updates|length }}</span>{% endif %}
     </a>
     {% endfor %}
 </div>
 
 <div class="pane">
-{% if active_section in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
+{% if active_section == "OVERVIEW" %}
+    <h3 class="pane-title">Overview</h3>
+    {% if p.context %}<p style="font-size:14.5px; line-height:1.6; max-width:700px;"><strong>{{ p.context }}</strong>{% if p.snapshot.overview %} — {{ p.snapshot.overview[0].text }}{% endif %}</p>{% endif %}
+    {% for e in p.snapshot.overview or [] %}
+    <div class="rec-meta">Recorded by {{ user_meta.get(e.by).name if user_meta.get(e.by) else "Unknown" }}, {{ roles.get(e.by, "") }} · <span class="time" data-time="{{ e.at }}">just now</span> · {{ e.source }}</div>
+    {% endfor %}
+    {% if p.latest %}
+    <p class="pane-note" style="margin-top:10px">Latest activity: <a href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section) }}">{{ p.latest.line }}</a> · <span class="time" data-time="{{ p.latest.at }}">just now</span></p>
+    {% endif %}
+    <div class="strip" style="margin-top:6px">
+        {% for sec in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
+        <a class="strip-cell" href="{{ url_for('patient_page', case_id=p.case_id, section=sec) }}">
+            <span class="strip-k">{{ section_labels[sec] }} — latest</span>
+            <span class="strip-v">{{ p.strip[sec] if p.strip[sec] else "No updates recorded" }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    <div style="margin-top:16px">
+            <div class="team-title">Disposition &amp; Responsibility</div>
+            {% if p.disposition %}
+            {% set d = p.disposition %}
+            <div style="font-size:13.5px; margin-bottom:8px">
+                <strong>Current responsible clinician:</strong> {{ d.responsible_label or "Not recorded" }}<br>
+                <strong>Receiving service:</strong> {{ d.receiving or "—" }}
+            </div>
+            {% for s in d.stages %}
+            <div class="task-line">
+                <span><strong>{{ s.label }}</strong><br><span class="task-line-owner">{{ s.detail }}</span></span>
+                <span class="pill{% if s.state == 'done' %} done{% elif s.state == 'current' %} amber{% endif %}">{{ s.state }}</span>
+            </div>
+            {% endfor %}
+            <p class="pane-note" style="margin-top:8px">A bed request or a receiving acceptance alone never removes the current clinician's responsibility. Responsibility transfers only at sign-off, when institution-approved transfer criteria are met. Intent, order placement, acceptance, and completed disposition are recorded as separate facts.</p>
+            {% set rec = d.record %}
+            {% if rec.intent == "ADMIT" and not rec.order_placed %}
+            <form method="POST" action="{{ url_for('disposition_bed_request') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <button type="submit">Record admission order / bed request (bed-slip)</button>
+            </form>
+            {% elif rec.intent == "ADMIT" and rec.order_placed and not rec.acceptance %}
+            <form method="POST" action="{{ url_for('disposition_acceptance') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label>Acceptance — who accepted:</label>
+                <input type="text" name="acceptor_label" placeholder="e.g. Cardiology — Dr. Reyes, or Maple Grove Rehab — Admissions" required>
+                <input type="text" name="service" placeholder="Receiving service (optional)">
+                <button type="submit">Record receiving acceptance</button>
+            </form>
+            {% elif rec.intent == "ADMIT" and rec.acceptance and not rec.completed %}
+            <form method="POST" action="{{ url_for('disposition_sign_off') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label>Sign-off — responsibility accepted by:</label>
+                <select name="new_responsible" required>
+                    {% for uid, u in users.items() %}{% if uid != rec.responsible %}<option value="{{ uid }}">{{ u.role_name }} — {{ u.name }}</option>{% endif %}{% endfor %}
+                </select>
+                <button type="submit">Sign off — transfer responsibility</button>
+                <span class="ack-hint">Only the current responsible clinician (or a charge nurse / care coordinator) can sign off, and only after acceptance is recorded.</span>
+            </form>
+            {% elif rec.intent == "DISCHARGE" and not rec.completed %}
+            <form method="POST" action="{{ url_for('disposition_complete') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <button type="submit">Complete discharge</button>
+                <span class="ack-hint">Recorded by the current responsible clinician (or a charge nurse / care coordinator).</span>
+            </form>
+            {% endif %}
+            {% else %}
+            <p class="pane-note">No disposition intent recorded for this patient yet.</p>
+            <form method="POST" action="{{ url_for('disposition_intent') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label>Intent:</label>
+                <select name="intent">
+                    <option value="ADMIT">Intent to admit</option>
+                    <option value="DISCHARGE">Intent to discharge</option>
+                </select>
+                <input type="text" name="service" placeholder="Intended admitting service, or discharge destination" required>
+                <button type="submit">Record intent</button>
+            </form>
+            {% endif %}
+        </div>
+
+{% elif active_section == "HPI" %}
+    <h3 class="pane-title">History of Present Illness</h3>
+    {% for e in p.snapshot.hpi or [] %}
+    <div class="rec-entry">
+        <div class="rec-text">{{ e.text }}</div>
+        <div class="rec-meta">Recorded by {{ user_meta.get(e.by).name if user_meta.get(e.by) else "Unknown" }}, {{ roles.get(e.by, "") }} · <span class="time" data-time="{{ e.at }}">just now</span> · {{ e.source }}</div>
+    </div>
+    {% else %}
+    <p class="pane-empty">No history of present illness has been recorded for this patient in this demonstration record. When a clinician records it, it appears here with their name and the source of the entry.</p>
+    {% endfor %}
+
+{% elif active_section == "MEDICAL_HISTORY" %}
+    <h3 class="pane-title">Medical History</h3>
+    {% for e in p.snapshot.medical_history or [] %}
+    <div class="rec-entry">
+        <div class="rec-text">{{ e.text }}</div>
+        <div class="rec-meta">Recorded by {{ user_meta.get(e.by).name if user_meta.get(e.by) else "Unknown" }}, {{ roles.get(e.by, "") }} · <span class="time" data-time="{{ e.at }}">just now</span> · {{ e.source }}</div>
+    </div>
+    {% else %}
+    <p class="pane-empty">No past medical history has been recorded for this patient in this demonstration record.</p>
+    {% endfor %}
+
+{% elif active_section == "VITALS" %}
+    <h3 class="pane-title">Vitals</h3>
+    <p class="pane-note">Recorded vital-sign sets with the clinician who performed them. Handoff displays recorded values; it does not interpret them.</p>
+    {% for v in p.snapshot.vitals or [] %}
+    <div class="task-line{% if hl and v.at == hl %} hl{% endif %}">
+        <span class="task-line-main"><strong>BP {{ v.bp }}</strong> · HR {{ v.hr }} · RR {{ v.rr }} · SpO₂ {{ v.spo2 }} · Temp {{ v.temp }}</span>
+        <span class="task-line-owner">{{ user_meta.get(v.by).name if user_meta.get(v.by) else "Unknown" }}, {{ roles.get(v.by, "") }} · <span class="time" data-time="{{ v.at }}">just now</span> · {{ v.source }}</span>
+    </div>
+    {% else %}
+    <p class="pane-empty">No vital signs have been recorded for this patient in this demonstration record.</p>
+    {% endfor %}
+
+{% elif active_section in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
     {% set data = p.sections_data[active_section] %}
     <h3 class="pane-title">{{ section_labels[active_section] }}</h3>
     {% if data.records or data.tasks %}
         {% for item in data.records|reverse %}
-        <div class="rec-entry">
+        <div class="rec-entry{% if hl and item.at == hl %} hl{% endif %}">
             <div class="rec-text">{{ item.text }}</div>
             <div class="rec-meta">Recorded by {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span> · Entered manually{% if item.get('id_confirmed') %} · Two patient identifiers confirmed{% endif %}</div>
         </div>
@@ -29,13 +144,51 @@
         <p class="pane-empty">No {{ section_labels[active_section]|lower }} updates recorded for this patient yet. When one is recorded, it will appear here under the name of the clinician who recorded it.</p>
     {% endif %}
 
+{% elif active_section == "UPDATES" %}
+    <h3 class="pane-title">Care-Team Updates</h3>
+    <p class="pane-note">Notes, orders, and updates recorded by the care team — each one attributed, timestamped, and filed here as well as under its clinical section. Documenting requires confirming two patient identifiers.</p>
+    {% if p.composer_task_id %}
+    <form method="POST" action="{{ url_for('add_note') }}" class="note-form" style="margin-bottom:16px">
+        <input type="hidden" name="handoff_id" value="{{ p.composer_task_id }}">
+        <input type="hidden" name="next" value="{{ url_for('patient_page', case_id=p.case_id, section='UPDATES') }}">
+        <label>Add an update to the record:</label>
+        <textarea name="text" rows="2" maxlength="1000" placeholder="Note, order, or update for this patient..." required></textarea>
+        <div class="note-row" style="align-items:center">
+            <label style="font-weight:normal"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+            <label style="font-weight:normal"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+        </div>
+        <div class="note-row">
+            <select name="note_type">
+                <option value="NOTE">Note</option>
+                <option value="ORDER">Order</option>
+                <option value="UPDATE">Update</option>
+            </select>
+            <select name="category">
+                <option value="GENERAL">General</option>
+                <option value="LAB">Lab</option>
+                <option value="DIAGNOSTIC">Diagnostic / Imaging</option>
+                <option value="CONSULT">Consultation</option>
+            </select>
+            <button type="submit" class="secondary">Add to Record</button>
+        </div>
+    </form>
+    {% endif %}
+    {% for item in p.updates|reverse %}
+    <div class="rec-entry{% if hl and item.at == hl %} hl{% endif %}">
+        <div class="rec-text">{{ item.text }}</div>
+        <div class="rec-meta">{{ item.type|title }} · {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span>{% if item.get('category') and item.category != "GENERAL" %} · {{ item.category|title }}{% endif %}{% if item.get('id_confirmed') %} · Two patient identifiers confirmed{% endif %}</div>
+    </div>
+    {% else %}
+    <p class="pane-empty">No care-team updates recorded yet for this patient.</p>
+    {% endfor %}
+
 {% elif active_section == "TASKS" %}
     <h3 class="pane-title">Pending Tasks</h3>
     <p class="pane-note">The baton decides accountability for each task. <strong>Holding the baton</strong> means the task is yours; <strong>acknowledgment</strong> means you have confirmed you received it. A task can be assigned to you before you have acknowledged it — both facts are shown on every card.</p>
     {% if p.open_tasks %}
     <div class="block-cards">
         {% for h in p.open_tasks %}
-            {% include "handoff_card.html" %}
+            <div{% if hl and h.history|selectattr('at', 'equalto', hl)|list %} class="hl-wrap"{% endif %}>{% include "handoff_card.html" %}</div>
         {% endfor %}
     </div>
     {% else %}
@@ -44,7 +197,7 @@
     {% set closed = p.tasks|selectattr("status", "in", ["COMPLETED", "CANCELED"])|list %}
     {% if closed %}
     <h4 class="pane-subtitle">Closed tasks</h4>
-    <p class="pane-note">A completed task always names what was completed, who completed it, when, and the documented outcome. Completing a task does not change the patient's disposition — see Disposition &amp; Responsibility above.</p>
+    <p class="pane-note">A completed task always names what was completed, who completed it, when, and the documented outcome. Completing a task does not change the patient's disposition — see Disposition &amp; Responsibility in the Overview.</p>
     {% for h in closed %}
     {% if h.status == "COMPLETED" and h.get('completion') %}
     <div class="rec-entry">
@@ -62,10 +215,10 @@
     {% endif %}
 
 {% elif active_section == "HISTORY" %}
-    <h3 class="pane-title">Handoff Accountability History</h3>
-    <p class="pane-note">Every baton movement, status change, acknowledgment, and cancellation for this patient — in order, with who did it. Passing the baton changes accountability for a task; it never removes anyone's ability to see or contribute to this patient's record.</p>
+    <h3 class="pane-title">Activity &amp; Accountability History</h3>
+    <p class="pane-note">Every baton movement, status change, acknowledgment, and cancellation for this patient — in order, with who did it. Passing the baton changes accountability for a task; it never removes anyone's ability to see or contribute to this patient's record. Clinical results live in their sections; this history is the accountability record.</p>
     {% for item in p.accountability|reverse %}
-    <div class="hist-row">
+    <div class="hist-row{% if hl and item.at == hl %} hl{% endif %}">
         <span class="hist-line">{{ item.line }}</span>
         <span class="hist-meta">{{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "" }} · <span class="time" data-time="{{ item.at }}">just now</span></span>
     </div>

@@ -60,9 +60,11 @@ def main():
     html = r.get_data(as_text=True)
     check("worklist renders 200", r.status_code == 200)
     check(f"worklist renders fast ({elapsed:.2f}s < 2s)", elapsed < 2.0)
-    check("her patients are grouped as patient blocks", html.count('class="patient-block"') >= 2)
-    check("the four status summaries still lead the page",
-          all(s in html for s in ["NEW", "IN PROGRESS", "ESCALATED", "COMPLETED", "Avg Completion"]))
+    check("her patients are listed as compact roster rows under My Patients",
+          "My Patients" in html and html.count('class="auth-row"') >= 2)
+    check("the four status categories lead as navigation chips (no metric band)",
+          all(s in html for s in ["New", "In Progress", "Escalated", "Completed"])
+          and "cat-chip" in html and "Avg Completion" not in html)
 
     print("== Search narrows the list (inside your authorized universe) ==")
     r = thompson.get("/?q=NGUYEN")
@@ -117,7 +119,7 @@ def main():
     state3 = nina.get("/api/state").get_json()
     check("opening the workspace clears the unread flag", state3["unread"].get("A44219") is False)
     r = nina.get("/fragments/worklist")
-    check("worklist fragment renders", r.status_code == 200 and "patient-block" in r.get_data(as_text=True))
+    check("worklist fragment renders", r.status_code == 200 and "auth-row" in r.get_data(as_text=True))
     erin = login("epriddy")
     r = erin.get("/fragments/patient/A44219")
     check("fragment enforces membership (non-member -> 403)", r.status_code == 403)

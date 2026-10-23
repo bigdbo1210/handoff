@@ -1,15 +1,14 @@
-{# Screen 1 content — shared by the homepage and the refresh fragment.
-   The metric cards lead: they count the signed-in clinician's authorized
-   universe, and selecting one filters this list (grouped by patient). #}
-<div class="metrics">
-    <a class="metric{% if active_filter == 'NEW' %} active{% endif %}" href="{{ url_for('index', filter='NEW') }}"><div><div class="num">{{ metrics.NEW }}</div><div class="lbl">NEW</div></div><div class="icon amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b06000" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div></a>
-    <a class="metric{% if active_filter == 'IN_PROGRESS' %} active{% endif %}" href="{{ url_for('index', filter='IN_PROGRESS') }}"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">IN PROGRESS</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></a>
-    <a class="metric alert{% if active_filter == 'ESCALATED' %} active{% endif %}" href="{{ url_for('index', filter='ESCALATED') }}"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">ESCALATED</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></a>
-    <a class="metric{% if active_filter == 'COMPLETED' %} active{% endif %}" href="{{ url_for('index', filter='COMPLETED') }}"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">COMPLETED</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></a>
-    <a class="metric{% if metrics.stale %} alert{% endif %}{% if active_filter == 'STALE' %} active{% endif %}" href="{{ url_for('index', filter='STALE') }}"><div><div class="num">{{ metrics.stale }}</div><div class="lbl">Waiting Too Long</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></a>
-    <a class="metric{% if active_filter == 'COMPLETIONS' %} active{% endif %}" href="{{ url_for('index', filter='COMPLETIONS') }}"><div><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></a>
+{# Screen 1 — the approved Directive 3.0 experience: My Patients first.
+   A compact, clickable roster; the four status categories are
+   navigation chips whose counts are computed from the roster data.
+   No metric band above the roster, and no inactivity categories —
+   the inactivity category was removed entirely (Derrick + Nina, 2026-10-23). #}
+<div class="cat-chips">
+    {% for f in ("NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED") %}
+    <a class="cat-chip{% if active_filter == f %} active{% endif %}" href="{{ url_for('index', filter=f) }}">{{ filter_labels[f] }} <span class="cat-count">{{ metrics[f] }}</span></a>
+    {% endfor %}
+    {% if active_filter %}<a class="cat-chip clear" href="{{ url_for('index') }}">Clear filter ✕</a>{% endif %}
 </div>
-<p class="metrics-note">Counts cover the patients you are authorized for. Select a card to filter this page; counts are <strong>tasks</strong>, grouped by patient.</p>
 
 {% if filter_kind == "status" %}
 {% set clear_url = url_for('index') %}
@@ -22,44 +21,20 @@
 {% else %}
 <div class="section-head">
     <h2>My Patients</h2>
-    <span class="section-sub">The patients you follow or hold an open baton for — latest activity first.</span>
+    <span class="section-sub">The patients you follow or hold an open baton for — latest activity first. Select a patient to open the workspace.</span>
 </div>
 {% if my_patients %}
-<div class="patient-blocks">
+<div class="auth-list">
     {% for p in my_patients %}
-    <div class="patient-block" data-case="{{ p.case_id }}">
-        <div class="patient-head">
-            <div class="patient-id">
-                {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
-                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section if p.latest else 'TASKS') }}">{{ p.patient_name }}</a>
-                <span class="patient-meta">Case: {{ p.case_id }}{% if p.dob %} · DOB {{ p.dob }}{% endif %}{% if p.mrn %} · MRN {{ p.mrn }}{% endif %}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
-            </div>
-            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id) }}">Open Patient →</a>
-        </div>
-        {% if p.latest %}
-        <a class="latest-line" href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section) }}">
-            <span class="latest-text">{{ p.latest.line }}</span>
-            <span class="latest-time time" data-time="{{ p.latest.at }}">just now</span>
-        </a>
-        {% endif %}
-        <div class="strip-chips">
-            {% for sec in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
-            <a class="strip-chip" href="{{ url_for('patient_page', case_id=p.case_id, section=sec) }}">
-                <span class="strip-chip-k">{{ section_labels[sec] }}</span>
-                <span class="strip-chip-v">{{ p.strip[sec] if p.strip[sec] else "No updates recorded" }}</span>
-            </a>
-            {% endfor %}
-        </div>
-        {% if p.open_tasks %}
-        <div class="block-cards">
-            {% for h in p.open_tasks %}
-                {% include "handoff_card.html" %}
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="no-open">No open tasks for this patient — all caught up.</p>
-        {% endif %}
-    </div>
+    <a class="auth-row" href="{{ url_for('patient_page', case_id=p.case_id) }}">
+        <span class="auth-main">
+            {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
+            <span class="auth-name">{{ p.patient_name }}</span>
+            <span class="auth-meta">Case: {{ p.case_id }}{% if p.dob %} · DOB {{ p.dob }}{% endif %}{% if p.mrn %} · MRN {{ p.mrn }}{% endif %}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
+        </span>
+        <span class="auth-latest">{{ p.latest.line if p.latest else "" }}</span>
+        <span class="auth-open">Open →</span>
+    </a>
     {% endfor %}
 </div>
 {% else %}
@@ -67,12 +42,12 @@
 {% endif %}
 
 <div class="section-head" style="margin-top: 26px;">
-    <h2>All Authorized Patients</h2>
-    <span class="section-sub">Every patient whose care team you are on. <a href="{{ url_for('board') }}">Operations board (by status) →</a></span>
+    <h2>Patient Directory</h2>
+    <span class="section-sub">Every patient whose care team you are on. <a href="{{ url_for('board') }}">Operations Board →</a></span>
 </div>
 <div class="auth-list">
     {% for p in authorized %}
-    <a class="auth-row" href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section if p.latest else 'TASKS') }}">
+    <a class="auth-row" href="{{ url_for('patient_page', case_id=p.case_id) }}">
         <span class="auth-main">
             {% if p.unread %}<span class="unread-dot"></span>{% endif %}
             <span class="auth-name">{{ p.patient_name }}</span>

@@ -69,9 +69,9 @@ def main():
     print("== Who gets clickable board cards ==")
     for name, client in [("Thompson (charge)", thompson), ("Lee (coordinator)", jlee)]:
         board = client.get("/board").get_data(as_text=True)
-        check(f"{name}: all six board cards are links",
+        check(f"{name}: all five board cards are links",
               all(f"/board?filter={f}" in board for f in
-                  ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "STALE", "COMPLETIONS"]))
+                  ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS"]))
     for name, client in [("Nina", nina), ("Williams", williams), ("Carter", carter)]:
         board = client.get("/board").get_data(as_text=True)
         check(f"{name}: board cards stay display-only", "/board?filter=" not in board)
@@ -91,7 +91,7 @@ def main():
           'class="column escalated"' not in page)
 
     totals = {"NEW": (5, 5), "IN_PROGRESS": (9, 9), "ESCALATED": (3, 3),
-              "COMPLETED": (3, 3), "STALE": (4, 4)}
+              "COMPLETED": (3, 3)}
     for f, want in totals.items():
         got = header_counts(thompson.get(f"/board?filter={f}").get_data(as_text=True))
         check(f"board filter {f}: counts agree with the board's own cards ({want[0]} tasks)",
@@ -118,7 +118,7 @@ def main():
     print("== Navigation only; search still wins; board cards work ==")
     before = snapshot()
     for client in (thompson, jlee, nina):
-        for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "STALE", "COMPLETIONS", "BOGUS"]:
+        for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS", "BOGUS"]:
             client.get(f"/board?filter={f}")
     check("no status, owner, acknowledgment, or history changed", snapshot() == before)
     page = thompson.get("/board?filter=BOGUS").get_data(as_text=True)
