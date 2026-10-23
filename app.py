@@ -668,7 +668,15 @@ def fragment_worklist():
 @app.route("/board")
 @login_required
 def board():
-    all_handoffs = [enrich(h) for h in load_handoffs()]
+    raw = load_handoffs()
+    care = load_care()
+    # The board enforces the same access scope as every other surface:
+    # a clinician sees the tasks of the patients they are authorized for.
+    # Unit-wide roles (charge nurse, care coordinator) are authorized
+    # for the whole unit, so their board is unchanged.
+    visible = [h for h in raw
+               if can_view_patient(current_user, raw, care, h.get("case_id"))]
+    all_handoffs = [enrich(h) for h in visible]
     metrics = compute_metrics(all_handoffs)
     meta = user_meta()
     q = (request.args.get("q") or "").strip()
@@ -689,7 +697,7 @@ def board():
         board_filter = None
     ctx = {}
     if board_filter in STATUS_FILTERS or board_filter == "COMPLETIONS":
-        ctx = build_worklist(load_handoffs(), load_care(), current_user, meta,
+        ctx = build_worklist(raw, care, current_user, meta,
                              active_filter=board_filter, unit_scope=True)
     else:
         board_filter = None
