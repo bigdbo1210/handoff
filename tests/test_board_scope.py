@@ -108,28 +108,23 @@ def main():
     brown = [h for h in seed if h["case_id"] == "D55231"][0]
     r = nina.post("/update-status", data={"handoff_id": brown["handoff_id"], "status": "COMPLETED"})
     check("task actions on unauthorized patients stay forbidden", r.status_code == 403)
-    # Contribution is not access: the legacy contributor model lets any
-    # signed-in clinician add an attributed record entry (the original
-    # workflow suite asserts this), but it exposes nothing back — the
-    # writer gains no view of the patient, on any surface.
-    # The handoff_id itself is not discoverable from any of her surfaces —
-    # she could only write to this record if she already knew the ID from
-    # legitimate clinical contact.
+    # Contribution requires prior authorization (policy, 2026-10-22):
+    # a clinician who is not on the care team cannot write into the
+    # record, and the attempt changes nothing — no membership is granted.
     surfaces = board + nina.get("/").get_data(as_text=True) + frag
     check("an unauthorized handoff's ID appears on none of her surfaces",
           brown["handoff_id"] not in surfaces)
+    state_before = json.loads(nina.get("/api/state").get_data(as_text=True))
     r = nina.post("/add-note", data={"handoff_id": brown["handoff_id"],
                                      "note_type": "NOTE", "text": "Cross-cover note"})
-    check("an attributed record entry can be contributed (legacy model)", r.status_code == 302)
+    check("an unauthorized contribution is denied (403)", r.status_code == 403)
     stored = [h for h in handoff_app.load_handoffs() if h["case_id"] == "D55231"][0]
-    check("the entry is attributed and the status untouched",
-          stored["status"] == "COMPLETED" and len(stored["history"]) == len(brown["history"]) + 1
-          and stored["history"][-1].get("by") is not None)
-    # The product's contributor rule (Nina's model, legacy suite): a
-    # clinician who documents on a patient joins that patient's care
-    # team. Deliberate and auditable — flagged to Derrick in the report.
-    check("documenting joins the care team (the product's contributor rule)",
-          nina.get("/patient/D55231").status_code == 200)
+    check("the denied attempt changed no patient data",
+          stored["status"] == "COMPLETED" and len(stored["history"]) == len(brown["history"]))
+    check("the denied attempt granted no membership",
+          nina.get("/patient/D55231").status_code == 403
+          and json.loads(nina.get("/api/state").get_data(as_text=True))["unread"].keys()
+              == state_before["unread"].keys())
 
     print(f"\n{passed} passed, {failed} failed")
     return 1 if failed else 0

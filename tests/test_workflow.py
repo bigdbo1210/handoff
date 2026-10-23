@@ -7,6 +7,13 @@ Covers the original prototype rules plus the new build:
   - contributor model: any signed-in team member can add record entries
     (notes/orders/updates) without owning the baton
 
+POLICY UPDATE (2026-10-22, approved by Derrick D. Dennis): contribution
+now requires verified care-team membership (or unit-wide organizational
+access) BEFORE the contribution is accepted. A clinician joins a team
+through the approved team-add mechanism — never by submitting a note.
+Three checks below were updated to this policy: the Resident is first
+denied, then added to the team by a member, then contributes as before.
+
 Run:  python tests/test_workflow.py
 """
 import json
@@ -87,11 +94,16 @@ check("Owner is now 6", h["owner"] == 6)
 check("History shows transfer 3 -> 6", any(e["event"] == "OWNERSHIP_TRANSFERRED" and "3" in e["by"] and "6" in e["by"] for e in h["history"]))
 
 # ---------- Nina's contributor model ----------
-# The Resident (2) does NOT own the baton but can add an order to the record.
+# The Resident (2) does NOT own the baton. Under the 2026-10-22 policy he
+# must be on the care team before he can contribute to the record.
 resident = handoff_app.app.test_client()
 login(resident, "dwilliams")
 r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "ORDER", "text": "Repeat troponin in 3 hours."})
-check("Non-owner can add an ORDER to the record", r.status_code == 302, f"status={r.status_code}")
+check("Contribution before team membership -> 403", r.status_code == 403, f"status={r.status_code}")
+r = rn.post("/team/add", data={"case_id": "A44219", "user_id": "2"})
+check("A team member adds the Resident to the care team", r.status_code == 302, f"status={r.status_code}")
+r = resident.post("/add-note", data={"handoff_id": hid, "note_type": "ORDER", "text": "Repeat troponin in 3 hours."})
+check("Non-owner team member can add an ORDER to the record", r.status_code == 302, f"status={r.status_code}")
 h = [x for x in load() if x["handoff_id"] == hid][0]
 rec = [e for e in h["history"] if e["event"] == "RECORD_ADDED"]
 check("Record entry is in history with text + author", len(rec) == 1 and rec[0]["text"] == "Repeat troponin in 3 hours." and rec[0]["by"] == 2)

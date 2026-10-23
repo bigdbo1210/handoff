@@ -150,3 +150,28 @@ The demo board now carries **18 fictional patients** (20 tasks — NGUYEN
 and PATEL carry two simultaneous tasks each). New test suites:
 `test_patient_model.py`, `test_permissions.py`, `test_ack_cancel.py`,
 `test_navigation_load.py` — all suites pass alongside the original two.
+
+## Contribution authorization (policy change, 2026-10-22)
+
+Approved by Derrick D. Dennis after the Operations Board scope review.
+
+- **Before:** any signed-in clinician could add a record entry (note /
+  order / update) to any handoff, and contributing made the clinician a
+  derived member of that patient's care team.
+- **Now:** a contribution is accepted only when the clinician ALREADY
+  holds verified care-team membership for that patient, or unit-wide
+  organizational access (charge nurse, care coordinator). Enforcement
+  is server-side on the contribution route; an unauthorized attempt is
+  denied with HTTP 403 and changes nothing — no membership, no history,
+  no patient data.
+- **Joining a team** happens through the approved team mechanism only:
+  a current team member, a charge nurse, or a care coordinator adds the
+  clinician from the patient's workspace ("Care team" strip).
+- Baton actions (status, transfer, acknowledge, cancel) are unchanged
+  and remain owner / role gated; membership alone never grants them.
+- **Legacy tests:** three checks in `tests/test_workflow.py` asserted
+  the old open-contribution behavior. They were updated — with the
+  change documented in that file — so the Resident is first denied,
+  then added to the team, then contributes. The checks' intent
+  (non-owners can document; late entries land on completed handoffs)
+  is preserved. New coverage: `tests/test_contribution_auth.py`.

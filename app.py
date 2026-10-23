@@ -1193,6 +1193,11 @@ def add_note():
     target = find_handoff(handoffs, handoff_id)
     if target is None:
         return "Handoff not found", 404
+    # Contribution requires authorization (policy, 2026-10-22): verified
+    # care-team membership or unit-wide organizational access. Submitting
+    # a note never confers membership.
+    if not can_view_patient(current_user, handoffs, load_care(), target.get("case_id")):
+        return "You are not on this patient's care team", 403
 
     ts = now_iso()
     target["history"].append({
