@@ -12,77 +12,13 @@
 <p class="metrics-note">Counts cover the patients you are authorized for. Select a card to filter this page; counts are <strong>tasks</strong>, grouped by patient.</p>
 
 {% if filter_kind == "status" %}
-<div class="section-head">
-    <h2>{{ filter_labels[active_filter] }}</h2>
-    <span class="section-sub"><strong>{{ filter_task_count }} task{{ "s" if filter_task_count != 1 }}</strong> across <strong>{{ filter_patient_count }} patient{{ "s" if filter_patient_count != 1 }}</strong> — your authorized patients only. <a href="{{ url_for('index') }}">Clear filter ✕</a></span>
-</div>
-{% if filter_groups %}
-<div class="patient-blocks">
-    {% for g in filter_groups %}
-    {% set p = g.patient %}
-    <div class="patient-block" data-case="{{ p.case_id }}">
-        <div class="patient-head">
-            <div class="patient-id">
-                {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
-                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">{{ p.patient_name }}</a>
-                <span class="patient-meta">Case: {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
-            </div>
-            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">Open Patient →</a>
-        </div>
-        {% for h in g.tasks %}
-        <details class="task-expand">
-            <summary class="task-summary">
-                <span class="ts-main"><strong>{{ h.event }}</strong> — {{ h.status.replace("_", " ").title() }}</span>
-                <span class="ts-meta">Baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}{% if not h.get('acknowledged_at') %} · <span class="ack-wait">awaiting acknowledgment</span>{% endif %} · <span class="time" data-time="{{ h.updated_at }}">just now</span></span>
-                <span class="ts-toggle">Expand ▾</span>
-            </summary>
-            {% include "handoff_card.html" %}
-        </details>
-        {% endfor %}
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="empty-block">No {{ filter_labels[active_filter]|lower }} tasks among your authorized patients right now.</div>
-{% endif %}
-
+{% set clear_url = url_for('index') %}
+{% set scope_note = "your authorized patients only" %}
+{% include "filter_groups.html" %}
 {% elif filter_kind == "completions" %}
-<div class="section-head">
-    <h2>Completion Times</h2>
-    <span class="section-sub">How long handoffs take, from creation to completion — your authorized patients only. <a href="{{ url_for('index') }}">Clear ✕</a></span>
-</div>
-{% if completion and completion.count %}
-<div class="stats-row">
-    <div class="stat-tile"><div class="stat-num">{{ completion.avg|fmt_minutes }}</div><div class="stat-lbl">Average</div></div>
-    <div class="stat-tile"><div class="stat-num">{{ completion.median|fmt_minutes }}</div><div class="stat-lbl">Median</div></div>
-    <div class="stat-tile"><div class="stat-num">{{ completion.min|fmt_minutes }}</div><div class="stat-lbl">Fastest</div></div>
-    <div class="stat-tile"><div class="stat-num">{{ completion.max|fmt_minutes }}</div><div class="stat-lbl">Slowest</div></div>
-    <div class="stat-tile"><div class="stat-num">{{ completion.count }}</div><div class="stat-lbl">Completed tasks counted</div></div>
-</div>
-<div class="patient-blocks">
-    {% for g in completion_groups %}
-    {% set p = g.patient %}
-    <div class="patient-block" data-case="{{ p.case_id }}">
-        <div class="patient-head">
-            <div class="patient-id">
-                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section='HISTORY') }}">{{ p.patient_name }}</a>
-                <span class="patient-meta">Case: {{ p.case_id }}{% if p.context %} · {{ p.context }}{% endif %}</span>
-            </div>
-            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section='HISTORY') }}">Open Patient →</a>
-        </div>
-        {% for row in g.rows %}
-        <div class="done-row">
-            <span class="done-main"><strong>{{ row.task.event }}</strong></span>
-            <span class="done-meta">took <strong>{{ row.minutes|fmt_minutes }}</strong> · completed <span class="time" data-time="{{ row.done_at }}">just now</span></span>
-        </div>
-        {% endfor %}
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="empty-block">No completed tasks with full timestamps among your authorized patients yet — the breakdown appears as handoffs complete.</div>
-{% endif %}
-
+{% set clear_url = url_for('index') %}
+{% set scope_note = "your authorized patients only" %}
+{% include "completion_breakdown.html" %}
 {% else %}
 <div class="section-head">
     <h2>My Patients</h2>

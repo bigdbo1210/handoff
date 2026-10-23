@@ -1,0 +1,35 @@
+{# Shared filtered-results rendering. Expects the filter context from
+   build_worklist plus clear_url and scope_note set by the host page. #}
+<div class="section-head">
+    <h2>{{ filter_labels[active_filter] }}</h2>
+    <span class="section-sub"><strong>{{ filter_task_count }} task{{ "s" if filter_task_count != 1 }}</strong> across <strong>{{ filter_patient_count }} patient{{ "s" if filter_patient_count != 1 }}</strong> — {{ scope_note }}. <a href="{{ clear_url }}">Clear filter ✕</a></span>
+</div>
+{% if filter_groups %}
+<div class="patient-blocks">
+    {% for g in filter_groups %}
+    {% set p = g.patient %}
+    <div class="patient-block" data-case="{{ p.case_id }}">
+        <div class="patient-head">
+            <div class="patient-id">
+                {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
+                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">{{ p.patient_name }}</a>
+                <span class="patient-meta">Case: {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
+            </div>
+            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">Open Patient →</a>
+        </div>
+        {% for h in g.tasks %}
+        <details class="task-expand">
+            <summary class="task-summary">
+                <span class="ts-main"><strong>{{ h.event }}</strong> — {{ h.status.replace("_", " ").title() }}</span>
+                <span class="ts-meta">Baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}{% if not h.get('acknowledged_at') %} · <span class="ack-wait">awaiting acknowledgment</span>{% endif %} · <span class="time" data-time="{{ h.updated_at }}">just now</span></span>
+                <span class="ts-toggle">Expand ▾</span>
+            </summary>
+            {% include "handoff_card.html" %}
+        </details>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-block">No {{ filter_labels[active_filter]|lower }} tasks in this view right now.</div>
+{% endif %}

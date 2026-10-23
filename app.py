@@ -277,6 +277,11 @@ def effective_member_ids(handoffs, care, case_id):
             ids.discard(uid)
     return ids
 
+def unit_wide_access(user):
+    """Charge nurses (role 4) and care coordinators (role 6) hold
+    unit-wide access — the single rule every scope decision uses."""
+    return str(getattr(user, "role_id", "")) in ORG_WIDE_ROLES
+
 def can_view_patient(user, handoffs, care, case_id):
     """Server-side workspace access: org-wide coordination roles, or
     care-team membership. Default is deny."""
@@ -539,7 +544,7 @@ def completion_stats(tasks):
         stats["max"] = round(durations[-1])
     return stats
 
-def build_worklist(handoffs, care, user, meta, q="", active_filter=None):
+def build_worklist(handoffs, care, user, meta, q="", active_filter=None, unit_scope=False):
     """Shared view-model for Screen 1 and its refresh fragment.
 
     The home-page metric cards describe the signed-in clinician's own
@@ -547,7 +552,13 @@ def build_worklist(handoffs, care, user, meta, q="", active_filter=None):
     selecting it can show that clinician. (The Operations Board keeps
     unit-wide numbers.)"""
     summaries = patient_summaries(handoffs, care, user, meta)
-    authorized_all = [p for p in summaries if p["can_view"]]
+    if unit_scope:
+        # Operations Board drill-down scope: the whole unit. The board
+        # route only honors a filter for unit-wide roles, and the patient
+        # workspace behind every link still enforces membership itself.
+        authorized_all = list(summaries)
+    else:
+        authorized_all = [p for p in summaries if p["can_view"]]
     scoped_tasks = [h for p in authorized_all for h in p["tasks"]]
     metrics = compute_metrics(scoped_tasks)
     if q:
@@ -672,8 +683,23 @@ def board():
                     fields += [m["name"], m["role"]]
             return any(needle in str(f).lower() for f in fields)
         handoffs = [h for h in all_handoffs if matches(h)]
-    return render_template("board.html", handoffs=handoffs, roles=display_roles(), users=USERS,
-                           metrics=metrics, user_meta=meta, q=q, total_count=len(all_handoffs))
+    can_drill = unit_wide_access(current_user)
+    board_filter = (request.args.get("filter") or "").upper() or None
+    if not can_drill or q:
+        board_filter = None
+    ctx = {}
+    if board_filter in STATUS_FILTERS or board_filter == "COMPLETIONS":
+        ctx = build_worklist(load_handoffs(), load_care(), current_user, meta,
+                             active_filter=board_filter, unit_scope=True)
+    else:
+        board_filter = None
+    kwargs = dict(handoffs=handoffs, roles=display_roles(), users=USERS,
+                  metrics=metrics, user_meta=meta, q=q, total_count=len(all_handoffs),
+                  user=str(current_user.id), can_drill=can_drill,
+                  board_filter=board_filter, section_labels=SECTION_LABELS,
+                  filter_labels=FILTER_LABELS)
+    kwargs.update(ctx)  # unit-scope ctx metrics are the board's own numbers
+    return render_template("board.html", **kwargs)
 
 # -----------------------------
 # Screen 2 — Individual patient workspace

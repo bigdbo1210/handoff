@@ -1,0 +1,37 @@
+{# Shared filtered-results rendering. Expects the filter context from
+   build_worklist plus clear_url and scope_note set by the host page. #}
+<div class="section-head">
+    <h2>Completion Times</h2>
+    <span class="section-sub">How long handoffs take, from creation to completion — {{ scope_note }}. <a href="{{ clear_url }}">Clear ✕</a></span>
+</div>
+{% if completion and completion.count %}
+<div class="stats-row">
+    <div class="stat-tile"><div class="stat-num">{{ completion.avg|fmt_minutes }}</div><div class="stat-lbl">Average</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.median|fmt_minutes }}</div><div class="stat-lbl">Median</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.min|fmt_minutes }}</div><div class="stat-lbl">Fastest</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.max|fmt_minutes }}</div><div class="stat-lbl">Slowest</div></div>
+    <div class="stat-tile"><div class="stat-num">{{ completion.count }}</div><div class="stat-lbl">Completed tasks counted</div></div>
+</div>
+<div class="patient-blocks">
+    {% for g in completion_groups %}
+    {% set p = g.patient %}
+    <div class="patient-block" data-case="{{ p.case_id }}">
+        <div class="patient-head">
+            <div class="patient-id">
+                <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section='HISTORY') }}">{{ p.patient_name }}</a>
+                <span class="patient-meta">Case: {{ p.case_id }}{% if p.context %} · {{ p.context }}{% endif %}</span>
+            </div>
+            <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section='HISTORY') }}">Open Patient →</a>
+        </div>
+        {% for row in g.rows %}
+        <div class="done-row">
+            <span class="done-main"><strong>{{ row.task.event }}</strong></span>
+            <span class="done-meta">took <strong>{{ row.minutes|fmt_minutes }}</strong> · completed <span class="time" data-time="{{ row.done_at }}">just now</span></span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-block">No completed tasks with full timestamps in this view yet — the breakdown appears as handoffs complete.</div>
+{% endif %}
