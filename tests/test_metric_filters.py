@@ -67,14 +67,14 @@ def main():
         os.unlink(care_path)
     handoff_app.save_handoffs(build_seed_handoffs())
 
-    thompson = login("nthompson")  # Charge Nurse — org-wide, sees all 18 patients
-    nina = login("njohnson")        # NP — authorized for 5 patients
+    thompson = login("nthompson")  # Charge Nurse — org-wide, sees all 19 patients
+    nina = login("njohnson")        # NP — authorized for 6 patients (journey added 2026-10-23)
 
     print("== Cards are present and scoped (org-wide view) ==")
     home = thompson.get("/").get_data(as_text=True)
     check("ESCALATED card counts 3", metric_num(home, "ESCALATED") == 3)
     check("NEW card counts 5", metric_num(home, "NEW") == 5)
-    check("COMPLETED card counts 3", metric_num(home, "COMPLETED") == 3)
+    check("COMPLETED card counts 6", metric_num(home, "COMPLETED") == 6)  # incl. 3 journey completions
     check("cards are links to filters", 'href="/?filter=ESCALATED"' in home)
 
     print("== ESCALATED filter: the 3 tasks, grouped by patient ==")
@@ -92,8 +92,8 @@ def main():
     page = thompson.get("/?filter=NEW").get_data(as_text=True)
     check("NEW shows 5 groups / 5 tasks", blocks(page) == 5 and task_cards(page) == 5)
     page = thompson.get("/?filter=COMPLETED").get_data(as_text=True)
-    check("COMPLETED shows the 3 finished patients",
-          blocks(page) == 3 and all(n in page for n in ["BROWN, D", "DAVIS, S", "WALKER, N"]))
+    check("COMPLETED shows the 4 finished patients",
+          blocks(page) == 4 and all(n in page for n in ["BROWN, D", "DAVIS, S", "WALKER, N", "PATTERSON, R"]))
     page = thompson.get("/?filter=STALE").get_data(as_text=True)
     check("the removed inactivity filter falls back to the plain roster",
           "My Patients" in page)

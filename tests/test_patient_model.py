@@ -40,7 +40,7 @@ def main():
 
     print("== Patient derivation ==")
     patients = handoff_app.all_patients(handoffs)
-    check("seed groups into 18 patients", len(patients) == 18)
+    check("seed groups into 19 patients", len(patients) == 19)  # +journey patient, 2026-10-23
     check("JOHNSON is one patient with one task", len(patients["A44219"]["tasks"]) == 1)
     check("NGUYEN is one patient with two simultaneous tasks", len(patients["G20817"]["tasks"]) == 2)
     check("PATEL is one patient with two simultaneous tasks", len(patients["H51092"]["tasks"]) == 2)

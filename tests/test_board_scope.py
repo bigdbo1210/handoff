@@ -51,7 +51,9 @@ def main():
     seed = build_seed_handoffs()
     handoff_app.save_handoffs(seed)
 
-    nina_cases = {"A44219", "E90214", "K90271", "P78193", "S60429"}
+    # H72410 (PATTERSON, R) joined Nina's authorized set 2026-10-23: she is
+    # on the demonstration journey patient's care team by design.
+    nina_cases = {"A44219", "E90214", "K90271", "P78193", "S60429", "H72410"}
     name_by_case = {}
     for h in seed:
         name_by_case.setdefault(str(h["case_id"]), h["patient_name"])
@@ -68,9 +70,10 @@ def main():
     check("no unauthorized patient appears anywhere on Nina's board", leaks == [])
     check("her authorized patients do appear",
           all(n in board for n in ["JOHNSON, M", "LEWIS, D", "WILSON, J"]))
-    check("her board metrics are scoped too (Escalated 1, Completed 0)",
-          board_num(board, "Escalated") == "1" and board_num(board, "Completed") == "0")
-    check("her board average is the honest empty state", board_num(board, "Avg Completion") == "—")
+    check("her board metrics are scoped too (Escalated 1, Completed 3 — journey tasks)",
+          board_num(board, "Escalated") == "1" and board_num(board, "Completed") == "3")
+    check("her board average reflects her authorized completions (journey: 207 min)",
+          board_num(board, "Avg Completion") == "207 min")
 
     board_w = williams.get("/board").get_data(as_text=True)
     check("Williams's board hides patients he has no access to",
@@ -78,11 +81,11 @@ def main():
     check("Williams's board shows his own patients", "SMITH, J" in board_w and "PATEL, R" in board_w)
 
     board_t = thompson.get("/board").get_data(as_text=True)
-    check("the charge nurse's board is the full unit (all 18 patients)",
+    check("the charge nurse's board is the full unit (all 19 patients)",
           all(n in board_t for n in name_by_case.values()))
-    check("her board metrics stay unit-wide (5 new / 3 escalated / 125 min)",
+    check("her board metrics stay unit-wide (5 new / 3 escalated / 166 min)",
           board_num(board_t, "New") == "5" and board_num(board_t, "Escalated") == "3"
-          and board_num(board_t, "Avg Completion") == "125 min")
+          and board_num(board_t, "Avg Completion") == "166 min")
 
     print("== Search respects the same scope ==")
     page = nina.get("/board?q=BROWN").get_data(as_text=True)
@@ -101,7 +104,7 @@ def main():
           all(n not in frag for n in unauthorized_names))
     state = json.loads(nina.get("/api/state").get_data(as_text=True))
     check("the state API covers exactly her authorized cases",
-          set(state["unread"].keys()) == nina_cases and state["patients"] == 5)
+          set(state["unread"].keys()) == nina_cases and state["patients"] == 6)
     check("workspace direct access still 403 for unauthorized patients",
           nina.get("/patient/D55231").status_code == 403
           and nina.get("/patient/B77102").status_code == 403)

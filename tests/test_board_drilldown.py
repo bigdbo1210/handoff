@@ -102,8 +102,9 @@ def main():
     check("the status columns step aside while filtered",
           'class="column escalated"' not in page)
 
-    totals = {"NEW": (5, 5), "IN_PROGRESS": (9, 9), "ESCALATED": (3, 3),
-              "COMPLETED": (3, 3), "CANCELED": (0, 0)}
+    # Totals include the 2026-10-23 journey patient (H72410).
+    totals = {"NEW": (5, 5), "IN_PROGRESS": (10, 10), "ESCALATED": (3, 3),
+              "COMPLETED": (6, 5), "CANCELED": (0, 0)}
     for f, want in totals.items():
         got = header_counts(thompson.get(f"/board?filter={f}").get_data(as_text=True))
         check(f"board filter {f}: counts agree with the board's own cards ({want[0]} tasks)",
@@ -111,7 +112,7 @@ def main():
 
     page = jlee.get("/board?filter=COMPLETIONS").get_data(as_text=True)
     check("coordinator: Average Completion opens the breakdown", page.count('class="stat-tile"') == 5)
-    check("breakdown shows the unit average", "2 h 05 min" in page)
+    check("breakdown shows the unit average", "2 h 46 min" in page)  # 166 min incl. journey completions
     check("completed rows carry durations and history links",
           "1 h 54 min" in page and "/patient/D55231?section=HISTORY" in page)
 

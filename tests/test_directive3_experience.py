@@ -202,6 +202,71 @@ def main():
         target = nina.get(m.group(1).replace("&amp;", "&")).get_data(as_text=True)
         check("the linked record renders highlighted", ' hl"' in target or "hl-wrap" in target)
 
+    print("== Vitals: entry form + attributed correction (Derrick, 2026-10-23) ==")
+    lee_v = nina.get("/patient/E90214?section=VITALS").get_data(as_text=True)
+    check("the Vitals pane offers a real entry form", 'action="/vitals/add"' in lee_v)
+    check("the Vitals pane offers a measurer-correction control",
+          'action="/vitals/amend"' in lee_v and "Document or correct the measurer" in lee_v)
+    r = nina.post("/vitals/add", data={
+        "case_id": "E90214", "bp": "121/76", "hr": "72", "rr": "15",
+        "spo2": "99% RA", "temp": "98.2°F", "measured_by": "8"})
+    check("documenting vitals without two identifiers is refused (400)", r.status_code == 400)
+    r = nina.post("/vitals/add", data={
+        "case_id": "E90214", "bp": "121/76", "hr": "72", "rr": "15",
+        "spo2": "99% RA", "temp": "98.2°F", "measured_by": "8",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("an authorized clinician can record new vital signs", r.status_code == 302)
+    lee_v = nina.get("/patient/E90214?section=VITALS").get_data(as_text=True)
+    check("the new set keeps measurer and recorder separate",
+          "121/76" in lee_v and ("Measured by: " + meta["8"]["name"]) in lee_v
+          and ("Recorded by " + meta["3"]["name"]) in lee_v)
+    williams = login("dwilliams")
+    r = williams.post("/vitals/add", data={
+        "case_id": "E90214", "bp": "120/80", "hr": "70", "rr": "14",
+        "spo2": "99% RA", "temp": "98.0°F", "measured_by": "",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("a clinician outside the care team cannot document vitals (403)",
+          r.status_code == 403)
+    m2 = re.search(r'name="entry_at" value="([^"]+)"', lee_v)
+    check("the seeded entry exposes its amendment key", m2 is not None)
+    if m2:
+        r = nina.post("/vitals/amend", data={
+            "case_id": "E90214", "entry_at": m2.group(1), "performed_by": "4",
+            "reason": "Measurer confirmed with the charge nurse after the fact.",
+            "id_confirm_name": "on", "id_confirm_dob": "on"})
+        check("documenting a measurer later succeeds as an amendment", r.status_code == 302)
+        lee_v2 = nina.get("/patient/E90214?section=VITALS").get_data(as_text=True)
+        check("the amendment names the measurer and preserves the original recorder",
+              ("Measured by: " + meta["4"]["name"]) in lee_v2
+              and ("Recorded by " + meta["7"]["name"]) in lee_v2
+              and "Correction · Measurer documented as" in lee_v2
+              and "Original entry preserved" in lee_v2)
+        lee_u = nina.get("/patient/E90214?section=UPDATES").get_data(as_text=True)
+        check("the correction is filed on the patient's record (audit trail)",
+              "Correction — measurer documented" in lee_u)
+
+    print("== The complete demonstration journey (PATTERSON, R) ==")
+    meta = handoff_app.user_meta()
+    pov = nina.get("/patient/H72410?section=OVERVIEW").get_data(as_text=True)
+    check("the journey patient is labeled a demonstration record",
+          "Fictional demonstration record" in pov)
+    check("the journey ends in a completed responsibility transfer",
+          "Responsibility transferred" in pov and "Internal Medicine (Hospitalist)" in pov)
+    pvit = nina.get("/patient/H72410?section=VITALS").get_data(as_text=True)
+    check("journey vitals carry documented measurers (triage split included)",
+          ("Measured by: " + meta["8"]["name"]) in pvit and "104/66" in pvit)
+    plab = nina.get("/patient/H72410?section=LABS").get_data(as_text=True)
+    check("journey labs tell the transfusion story", "Hemoglobin 7.1" in plab and "Hemoglobin 8.9" in plab)
+    pcon = nina.get("/patient/H72410?section=CONSULTS").get_data(as_text=True)
+    check("journey consult shows request, acknowledgment, performance, review",
+          "consultation requested" in pcon.lower() and "acknowledged by the GI service" in pcon
+          and "Consultation performed at bedside" in pcon and "recommendations reviewed" in pcon.lower())
+    ptask = nina.get("/patient/H72410?section=TASKS").get_data(as_text=True)
+    check("journey tasks carry specific documented outcomes",
+          "transfused without reaction" in ptask and "bleeding duodenal ulcer treated with clips" in ptask)
+    phist = nina.get("/patient/H72410?section=HISTORY").get_data(as_text=True)
+    check("journey accountability timeline includes the baton pass", "Baton passed" in phist)
+
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)
 

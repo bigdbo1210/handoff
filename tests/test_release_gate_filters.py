@@ -102,8 +102,10 @@ def main():
 
     print("== #5 Permissions on filtered results and actions ==")
     page_n = nina.get("/?filter=COMPLETED").get_data(as_text=True)
-    check("Nina's COMPLETED filter is empty (no authorized completed patients)",
-          'class="patient-block"' not in page_n)
+    # Since 2026-10-23 Nina IS authorized for one completed patient — the
+    # demonstration journey patient (PATTERSON, R) — and only that one.
+    check("Nina's COMPLETED filter shows only her authorized completed patient",
+          'class="patient-block"' in page_n and "PATTERSON, R" in page_n)
     check("no unauthorized completed patients leak",
           all(n not in page_n for n in ["BROWN, D", "DAVIS, S", "WALKER, N"]))
     lewis = [h for h in handoff_app.load_handoffs() if h["case_id"] == "P78193"][0]

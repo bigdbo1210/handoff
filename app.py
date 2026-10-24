@@ -1659,5 +1659,136 @@ def add_note():
     save_handoffs(handoffs)
     return redirect(request.form.get("next") or url_for("index"))
 
+
+# -----------------------------
+# Vital signs: entry + correction (Directive 3.0, Derrick 2026-10-23)
+# -----------------------------
+# The Vitals pane is a working documentation surface, not a display.
+# "Measured by" and "Recorded by" are independent fields: the recorder
+# is always the authenticated user; the measurer is documented only
+# when actually known — never assumed from team membership. For an
+# existing entry whose measurer was never established, an authorized
+# clinician may document it later as an attributed, timestamped
+# amendment; the original entry is preserved untouched.
+
+def _parse_local_dt(raw):
+    """A datetime-local form value, interpreted as Eastern local time."""
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return "INVALID"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("America/New_York"))
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _vitals_guard(case_id):
+    handoffs = load_handoffs()
+    care = load_care()
+    if case_id not in all_patients(handoffs):
+        return None, None, ("Patient not found", 404)
+    if not can_view_patient(current_user, handoffs, care, case_id):
+        return None, None, ("You are not on this patient's care team", 403)
+    if request.form.get("id_confirm_name") != "on" or request.form.get("id_confirm_dob") != "on":
+        return None, None, ("Two patient identifiers must be confirmed before documenting care", 400)
+    return handoffs, care, None
+
+
+def _file_record(handoffs, case_id, text, performed_by=None):
+    tasks = [h for h in handoffs if str(h.get("case_id")) == str(case_id)]
+    if not tasks:
+        return
+    target = max(tasks, key=lambda h: h.get("updated_at", ""))
+    entry = {"at": now_iso(), "event": "RECORD_ADDED", "type": "UPDATE",
+             "category": "GENERAL", "text": text, "by": int(current_user.id),
+             "id_confirmed": True}
+    if performed_by:
+        entry["performed_by"] = performed_by
+        entry["performed_at"] = entry["at"]
+    target["history"].append(entry)
+    target["updated_at"] = entry["at"]
+
+
+@app.route("/vitals/add", methods=["POST"])
+@login_required
+def vitals_add():
+    case_id = str(request.form.get("case_id") or "")
+    handoffs, care, err = _vitals_guard(case_id)
+    if err:
+        return err
+    def _f(name):
+        return (request.form.get(name) or "").strip()
+    bp, hr, rr, spo2, temp = _f("bp"), _f("hr"), _f("rr"), _f("spo2"), _f("temp")
+    if not (bp and hr and rr and spo2 and temp):
+        return "All vital-sign values are required", 400
+    measured_by = _f("measured_by")
+    if measured_by and not (measured_by.isdigit() and measured_by in USERS):
+        return "Invalid measurer", 400
+    measured_at = _parse_local_dt(_f("measured_at"))
+    if measured_at == "INVALID":
+        return "Invalid measurement time", 400
+    ts = now_iso()
+    entry = {"bp": bp, "hr": hr, "rr": rr, "spo2": spo2, "temp": temp,
+             "by": str(current_user.id), "at": ts, "source": "Manually entered"}
+    if measured_by:
+        entry["performed_by"] = measured_by
+        entry["performed_at"] = measured_at or ts
+    snap = care["snapshots"].setdefault(case_id, {})
+    snap.setdefault("vitals", []).append(entry)
+    meta = user_meta()
+    measurer = meta.get(measured_by, {}).get("name") if measured_by else "Not documented"
+    _file_record(handoffs, case_id,
+                 f"Vital signs recorded — BP {bp} · HR {hr} · RR {rr} · SpO₂ {spo2} · Temp {temp}. "
+                 f"Measured by: {measurer}.")
+    save_handoffs(handoffs)
+    save_care(care)
+    flash("Vital signs recorded — measurer and recorder are documented separately.")
+    return redirect(url_for("patient_page", case_id=case_id, section="VITALS"))
+
+
+@app.route("/vitals/amend", methods=["POST"])
+@login_required
+def vitals_amend():
+    case_id = str(request.form.get("case_id") or "")
+    entry_at = (request.form.get("entry_at") or "").strip()
+    handoffs, care, err = _vitals_guard(case_id)
+    if err:
+        return err
+    performed_by = (request.form.get("performed_by") or "").strip()
+    if not (performed_by.isdigit() and performed_by in USERS):
+        return "Choose the clinician who actually measured these vital signs", 400
+    performed_at = _parse_local_dt((request.form.get("performed_at") or "").strip())
+    if performed_at == "INVALID":
+        return "Invalid measurement time", 400
+    reason = (request.form.get("reason") or "").strip()
+    if not reason:
+        return "A reason is required to amend a clinical entry", 400
+    if len(reason) > 300:
+        return "Reason too long (300 characters max)", 400
+    snap = care["snapshots"].get(case_id) or {}
+    target = next((v for v in snap.get("vitals", []) if v.get("at") == entry_at), None)
+    if target is None:
+        return "Vital-sign entry not found", 404
+    ts = now_iso()
+    target.setdefault("amendments", []).append({
+        "kind": "MEASURER_DOCUMENTED",
+        "performed_by": performed_by,
+        "performed_at": performed_at,
+        "by": str(current_user.id), "at": ts, "reason": reason,
+    })
+    meta = user_meta()
+    measurer = meta.get(performed_by, {}).get("name", "Unknown")
+    _file_record(handoffs, case_id,
+                 f"Correction — measurer documented for the vital-sign set recorded "
+                 f"{fmt_ts_str(target.get('at'))}: {measurer}. Reason: {reason} "
+                 f"Original entry preserved.")
+    save_handoffs(handoffs)
+    save_care(care)
+    flash("Measurer documented as an amendment — the original entry is preserved.")
+    return redirect(url_for("patient_page", case_id=case_id, section="VITALS"))
+
+
 if __name__ == "__main__":
     app.run(debug=os.environ.get("HANDOFF_DEBUG", "1") == "1")

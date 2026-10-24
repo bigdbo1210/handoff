@@ -15,6 +15,11 @@
 <div class="pane">
 {% if active_section == "OVERVIEW" %}
     <h3 class="pane-title">Overview</h3>
+    {% if p.snapshot.get('demonstration') %}
+    <div class="rec-entry" style="border:1.5px dashed #b06000; background:#fff8ec;">
+        <div class="rec-text"><strong>Fictional demonstration record — complete care-coordination journey.</strong> This patient's record was authored as a connected demonstration: presentation, history, vitals, labs, imaging, consultation, tasks, disposition, acceptance, sign-off, and responsibility transfer, consistent across every tab.</div>
+    </div>
+    {% endif %}
     {% if p.context %}<p style="font-size:14.5px; line-height:1.6; max-width:700px;"><strong>{{ p.context }}</strong>{% if p.snapshot.overview %} — {{ p.snapshot.overview[0].text }}{% endif %}</p>{% endif %}
     {% for e in p.snapshot.overview or [] %}
     {{ attribution(user_meta, roles, e.by, e.at, source=e.source, performed_id=e.get('performed_by'), performed_at=e.get('performed_at')) }}
@@ -120,11 +125,59 @@
     <div class="rec-entry{% if hl and v.at == hl %} hl{% endif %}">
         <div class="rec-text"><strong>BP {{ v.bp }}</strong> · HR {{ v.hr }} · RR {{ v.rr }} · SpO₂ {{ v.spo2 }} · Temp {{ v.temp }}</div>{% if v.get('demonstration') %}
         <div class="rec-meta" style="font-weight:700; color:#7c2d12;">Demonstration entry — fictional example of split attribution: measured by one clinician, recorded by another.</div>{% endif %}
-        {{ attribution(user_meta, roles, v.by, v.at, source=v.source, performed_id=v.get('performed_by'), performed_at=v.get('performed_at'), performed_label="Measured by") }}
+        {% set last_amend = v.amendments[-1] if v.get('amendments') else None %}
+        {{ attribution(user_meta, roles, v.by, v.at, source=v.source, performed_id=(last_amend.performed_by if last_amend else v.get('performed_by')), performed_at=(last_amend.performed_at if last_amend else v.get('performed_at')), performed_label="Measured by") }}
+        {% for a in v.get('amendments') or [] %}
+        <div class="rec-meta">Correction · Measurer documented as {{ user_meta.get(a.performed_by, {}).get('name', 'Unknown') }} by {{ user_meta.get(a.by, {}).get('name', 'Unknown') }} · <span class="time" data-time="{{ a.at }}">{{ a.at | fmt_ts }}</span> · Reason: {{ a.reason }} · Original entry preserved.</div>
+        {% endfor %}
+        <details class="amend-box">
+            <summary>Document or correct the measurer</summary>
+            <form method="POST" action="{{ url_for('vitals_amend') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <input type="hidden" name="entry_at" value="{{ v.at }}">
+                <label>Measured by (the clinician who actually obtained these vital signs):
+                    <select name="performed_by" required>
+                        <option value="">Select the measurer…</option>
+                        {% for uid, m in user_meta.items() %}<option value="{{ uid }}">{{ m.name }}</option>{% endfor %}
+                    </select></label>
+                <label>Measurement date &amp; time (Eastern), if known: <input type="datetime-local" name="performed_at"></label>
+                <label>Reason for documenting / correcting: <input type="text" name="reason" maxlength="300" required></label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+                <button type="submit">Save as amendment</button>
+            </form>
+        </details>
     </div>
     {% else %}
     <p class="pane-empty">No vital signs have been recorded for this patient in this demonstration record.</p>
     {% endfor %}
+    <div class="composer">
+        <div class="composer-title">Record vital signs:</div>
+        <form method="POST" action="{{ url_for('vitals_add') }}">
+            <input type="hidden" name="case_id" value="{{ p.case_id }}">
+            <div class="vitals-grid">
+                <label>BP <input type="text" name="bp" placeholder="138/82" required></label>
+                <label>HR <input type="text" name="hr" placeholder="79" required></label>
+                <label>RR <input type="text" name="rr" placeholder="16" required></label>
+                <label>SpO₂ <input type="text" name="spo2" placeholder="99% RA" required></label>
+                <label>Temp <input type="text" name="temp" placeholder="98.3°F" required></label>
+            </div>
+            <div class="composer-row">
+                <label>Measured by:
+                    <select name="measured_by">
+                        <option value="">Not documented</option>
+                        {% for uid, m in user_meta.items() %}<option value="{{ uid }}">{{ m.name }}</option>{% endfor %}
+                    </select></label>
+                <label>Measurement date &amp; time (Eastern), if different from now: <input type="datetime-local" name="measured_at"></label>
+            </div>
+            <div class="composer-row">
+                <label class="ack-label"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+                <button type="submit">Add to Record</button>
+            </div>
+            <p class="pane-note">Recorded by is always you, the signed-in clinician, with the actual entry time. Measured by is documented only when known — never assumed.</p>
+        </form>
+    </div>
 
 {% elif active_section in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
     {% set data = p.sections_data[active_section] %}

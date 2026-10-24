@@ -1,7 +1,7 @@
 """
 Navigation at scale (Requirement: 15-20 fictional patients).
 
-With 18 patients on the board, the two-screen navigation must stay
+With 19 patients on the board, the two-screen navigation must stay
 efficient: the worklist renders fast, search narrows to one patient,
 deep links land on the right sections, and every authorized patient
 workspace opens. Also covers the automatic-update plumbing: the state
@@ -48,7 +48,7 @@ def main():
     handoffs = build_seed_handoffs()
     handoff_app.save_handoffs(handoffs)
     case_ids = sorted({h["case_id"] for h in handoffs})
-    check("board carries 18 fictional patients", len(case_ids) == 18)
+    check("board carries 19 fictional patients", len(case_ids) == 19)  # +journey patient, 2026-10-23
 
     nina = login("njohnson")
     thompson = login("nthompson")
