@@ -132,6 +132,9 @@ def main():
     canceled = nina.get("/board?filter=CANCELED").get_data(as_text=True)
     check("the Canceled box filters (0 canceled in her universe, honestly)",
           "0 tasks" in canceled or "0 task" in canceled)
+    esc = nina.get("/board?filter=ESCALATED").get_data(as_text=True)
+    check("selecting the active category again returns the full board (Master Directive §3)",
+          'metric alert active" href="/board"' in esc)
 
     print("== Attribution: performer and recorder are never merged ==")
     meta = handoff_app.user_meta()
