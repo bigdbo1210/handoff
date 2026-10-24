@@ -26,7 +26,7 @@
         {% for row in g.rows %}
         <div class="done-row">
             <span class="done-main"><strong>{{ row.task.event }}</strong></span>
-            <span class="done-meta">took <strong>{{ row.minutes|fmt_minutes }}</strong> · completed <span class="time" data-time="{{ row.done_at }}">just now</span></span>
+            <span class="done-meta">took <strong>{{ row.minutes|fmt_minutes }}</strong> · completed <span class="time" data-time="{{ row.done_at }}">{{ row.done_at | fmt_ts }}</span></span>
         </div>
         {% endfor %}
     </div>

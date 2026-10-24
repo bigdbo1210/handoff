@@ -30,9 +30,9 @@
 
 <div class="card-meta">
     {% if h.status == "COMPLETED" %}
-        <span class="pill done">&#10003; <span class="time" data-time="{{ h.updated_at }}">just now</span></span>
+        <span class="pill done">&#10003; <span class="time" data-time="{{ h.updated_at }}">{{ h.updated_at | fmt_ts }}</span></span>
     {% else %}
-        <span class="pill{% if h.stale_level %} {{ h.stale_level }}{% endif %}"><span class="time" data-time="{{ h.updated_at }}">just now</span></span>
+        <span class="pill{% if h.stale_level %} {{ h.stale_level }}{% endif %}"><span class="time" data-time="{{ h.updated_at }}">{{ h.updated_at | fmt_ts }}</span></span>
     {% endif %}
 </div>
 

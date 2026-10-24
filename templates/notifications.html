@@ -62,7 +62,7 @@
                 </div>
                 <div class="n-text">{{ n.text }}</div>
                 <div class="n-meta">
-                    {% set bm = user_meta.get(n.by|string) %}{{ bm.name if bm else "System" }}{% if bm %} · {{ bm.role }}{% endif %} · <span class="time" data-time="{{ n.at }}">{{ n.at }}</span>
+                    {% set bm = user_meta.get(n.by|string) %}{{ bm.name if bm else "System" }}{% if bm %} · {{ bm.role }}{% endif %} · <span class="time" data-time="{{ n.at }}">{{ n.at | fmt_ts }}</span>
                     <a class="rec-link" href="{{ url_for('patient_page', case_id=n.case_id, section=n.section, hl=n.hl) }}">Open the exact record →</a>
                     {% if not n.read %}<span class="chip new">New</span>{% endif %}
                     {% if n.ack_required and n.acked %}<span class="chip ack">Acknowledged ✓</span>{% elif n.ack_required %}<span class="chip need">Acknowledgment required</span>{% endif %}
@@ -83,10 +83,13 @@
 <script>
 document.querySelectorAll('.time').forEach(el => {
     const t = el.getAttribute('data-time');
-    if (t) {
-        const d = Math.floor((new Date() - new Date(t)) / 60000);
-        el.innerText = d < 1 ? "just now" : d < 60 ? d + " min ago" : d < 1440 ? Math.floor(d / 60) + " hr ago" : Math.floor(d / 1440) + " day(s) ago";
-    }
+    if (!t) { el.innerText = "Not documented"; return; }
+    const dt = new Date(t);
+    if (isNaN(dt)) return;
+    const exact = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(dt);
+    const d = Math.floor((new Date() - dt) / 60000);
+    const rel = d < 1 ? "just now" : d < 60 ? d + " min ago" : d < 1440 ? Math.floor(d / 60) + " hr ago" : Math.floor(d / 1440) + " day(s) ago";
+    el.innerText = exact + " (" + rel + ")";
 });
 </script>
 <script>

@@ -14,12 +14,12 @@
 <div class="attr-block">
     {% if performed_id and user_meta.get(performed_id|string) %}
     {% set pm = user_meta.get(performed_id|string) %}
-    <div class="rec-meta">{{ performed_label }}: {{ pm.name }}, {{ pm.role }}{% if performed_at %} · <span class="time" data-time="{{ performed_at }}">just now</span>{% endif %} · Staff ID {{ pm.staff_id_masked }}</div>
+    <div class="rec-meta">{{ performed_label }}: {{ pm.name }}, {{ pm.role }}{% if performed_at %} · <span class="time" data-time="{{ performed_at }}">{{ performed_at | fmt_ts }}</span>{% endif %} · Staff ID {{ pm.staff_id_masked }}</div>
     {% else %}
     <div class="rec-meta">{{ performed_label }}: Not documented</div>
     {% endif %}
     {% set rm = user_meta.get(recorded_id|string) %}
-    <div class="rec-meta">Recorded by {{ rm.name if rm else "Unknown" }}, {{ rm.role if rm else "" }} · <span class="time" data-time="{{ recorded_at }}">just now</span>{% if source %} · {{ source }}{% endif %}{% if rm %} · Staff ID {{ rm.staff_id_masked }}{% endif %}</div>
+    <div class="rec-meta">Recorded by {{ rm.name if rm else "Unknown" }}, {{ rm.role if rm else "" }} · <span class="time" data-time="{{ recorded_at }}">{{ recorded_at | fmt_ts }}</span>{% if source %} · {{ source }}{% endif %}{% if rm %} · Staff ID {{ rm.staff_id_masked }}{% endif %}</div>
     {% if show_origin %}
     <div class="rec-meta">Information source: {{ origin if origin else "Not documented" }}</div>
     {% endif %}

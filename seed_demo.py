@@ -78,8 +78,9 @@ def build_seed_care():
                     {"text": "Type 2 diabetes mellitus — metformin; last A1c 7.4 (per patient report).", "by": "3", "at": t(170), "source": "Manually entered"},
                     {"text": "Prior TIA (2024) — no residual deficits.", "by": "3", "at": t(169), "source": "Manually entered"}],
                 "vitals": [
-                    {"bp": "158/92", "hr": "88", "rr": "18", "spo2": "97% RA", "temp": "98.4\u00b0F", "by": "8", "at": t(150), "performed_by": "8", "performed_at": t(153), "source": "Manually entered"},
-                    {"bp": "149/88", "hr": "84", "rr": "17", "spo2": "98% RA", "temp": "98.6\u00b0F", "by": "3", "at": t(40), "performed_by": "8", "performed_at": t(45), "source": "Manually entered"}],
+                    {"bp": "158/92", "hr": "88", "rr": "18", "spo2": "97% RA", "temp": "98.4\u00b0F", "by": "8", "at": t(150), "source": "Manually entered"},
+                    {"bp": "149/88", "hr": "84", "rr": "17", "spo2": "98% RA", "temp": "98.6\u00b0F", "by": "3", "at": t(40), "source": "Manually entered"},
+                    {"bp": "142/86", "hr": "81", "rr": "16", "spo2": "98% RA", "temp": "98.5\u00b0F", "by": "3", "at": t(12), "performed_by": "8", "performed_at": t(15), "source": "Manually entered", "demonstration": True}],
             },
             "B77102": {
                 "overview": [{"text": "82-year-old with a hip fracture after a fall at home. Surgical repair completed; discharge planning to inpatient rehabilitation is the active work.", "by": "7", "at": t(300), "source": "Manually entered"}],
@@ -88,7 +89,7 @@ def build_seed_care():
                     {"text": "Osteoporosis — on calcium/vitamin D.", "by": "7", "at": t(290), "source": "Manually entered"},
                     {"text": "Chronic kidney disease, stage 3 — baseline creatinine 1.4.", "by": "7", "at": t(290), "source": "Manually entered"}],
                 "vitals": [
-                    {"bp": "132/78", "hr": "76", "rr": "16", "spo2": "96% RA", "temp": "98.2\u00b0F", "by": "6", "at": t(120), "performed_by": "4", "performed_at": t(124), "source": "Manually entered"}],
+                    {"bp": "132/78", "hr": "76", "rr": "16", "spo2": "96% RA", "temp": "98.2\u00b0F", "by": "6", "at": t(120), "source": "Manually entered"}],
             },
             "C30981": {
                 "overview": [{"text": "67-year-old under evaluation for chest pain. Serial troponins and cardiology input are the active work; no disposition intent recorded yet.", "by": "2", "at": t(140), "source": "Manually entered"}],
@@ -97,7 +98,7 @@ def build_seed_care():
                     {"text": "Hypertension — on amlodipine.", "by": "2", "at": t(130), "source": "Manually entered"},
                     {"text": "Hyperlipidemia — on atorvastatin.", "by": "2", "at": t(130), "source": "Manually entered"}],
                 "vitals": [
-                    {"bp": "146/84", "hr": "92", "rr": "18", "spo2": "98% RA", "temp": "98.1\u00b0F", "by": "4", "at": t(125), "performed_by": "4", "performed_at": t(125), "source": "Manually entered"}],
+                    {"bp": "146/84", "hr": "92", "rr": "18", "spo2": "98% RA", "temp": "98.1\u00b0F", "by": "4", "at": t(125), "source": "Manually entered"}],
             },
             "E90214": {
                 "overview": [{"text": "65-year-old with chest pain under a cardiology rule-out pathway. Cardiology consultation is the active work.", "by": "3", "at": t(200), "source": "Manually entered"}],
@@ -106,7 +107,7 @@ def build_seed_care():
                     {"text": "GERD — on omeprazole.", "by": "3", "at": t(195), "source": "Manually entered"},
                     {"text": "Former smoker — quit 2015.", "by": "3", "at": t(195), "source": "Manually entered"}],
                 "vitals": [
-                    {"bp": "138/82", "hr": "79", "rr": "16", "spo2": "99% RA", "temp": "98.3\u00b0F", "by": "7", "at": t(90), "performed_by": "4", "performed_at": t(94), "source": "Manually entered"}],
+                    {"bp": "138/82", "hr": "79", "rr": "16", "spo2": "99% RA", "temp": "98.3\u00b0F", "by": "7", "at": t(90), "source": "Manually entered"}],
             },
             "F31407": {
                 "overview": [{"text": "7-year-old seen for a barky cough and noisy breathing overnight. Family at bedside; childcare setting notified per family request.", "by": "8", "at": t(100), "source": "Manually entered"}],
@@ -115,7 +116,7 @@ def build_seed_care():
                     {"text": "No chronic conditions reported by family.", "by": "8", "at": t(95), "source": "Manually entered", "origin": "Caregiver-reported"},
                     {"text": "Immunizations per family report are current (record not yet verified).", "by": "8", "at": t(95), "source": "Manually entered", "origin": "Caregiver-reported"}],
                 "vitals": [
-                    {"bp": "102/64", "hr": "118", "rr": "24", "spo2": "97% RA", "temp": "99.8\u00b0F", "by": "8", "at": t(80), "performed_by": "8", "performed_at": t(82), "source": "Manually entered"}],
+                    {"bp": "102/64", "hr": "118", "rr": "24", "spo2": "97% RA", "temp": "99.8\u00b0F", "by": "8", "at": t(80), "source": "Manually entered"}],
             },
         },
         "notifications": [

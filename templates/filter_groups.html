@@ -21,7 +21,7 @@
         <details class="task-expand">
             <summary class="task-summary">
                 <span class="ts-main"><strong>{{ h.event }}</strong> — {{ h.status.replace("_", " ").title() }}</span>
-                <span class="ts-meta">Baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}{% if not h.get('acknowledged_at') %} · <span class="ack-wait">awaiting acknowledgment</span>{% endif %} · <span class="time" data-time="{{ h.updated_at }}">just now</span></span>
+                <span class="ts-meta">Baton: {{ user_meta.get(h.owner|string).name if user_meta.get(h.owner|string) else "Unknown" }}{% if not h.get('acknowledged_at') %} · <span class="ack-wait">awaiting acknowledgment</span>{% endif %} · <span class="time" data-time="{{ h.updated_at }}">{{ h.updated_at | fmt_ts }}</span></span>
                 <span class="ts-toggle">Expand ▾</span>
             </summary>
             {% include "handoff_card.html" %}

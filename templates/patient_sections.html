@@ -20,7 +20,7 @@
     {{ attribution(user_meta, roles, e.by, e.at, source=e.source, performed_id=e.get('performed_by'), performed_at=e.get('performed_at')) }}
     {% endfor %}
     {% if p.latest %}
-    <p class="pane-note" style="margin-top:10px">Latest activity: <a href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section) }}">{{ p.latest.line }}</a> · <span class="time" data-time="{{ p.latest.at }}">just now</span></p>
+    <p class="pane-note" style="margin-top:10px">Latest activity: <a href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section) }}">{{ p.latest.line }}</a> · <span class="time" data-time="{{ p.latest.at }}">{{ p.latest.at | fmt_ts }}</span></p>
     {% endif %}
     <div class="strip" style="margin-top:6px">
         {% for sec in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
@@ -118,7 +118,8 @@
     <p class="pane-note">Recorded vital-sign sets. Who measured them and who recorded them are shown separately — the two are never merged. Handoff displays recorded values; it does not interpret them.</p>
     {% for v in p.snapshot.vitals or [] %}
     <div class="rec-entry{% if hl and v.at == hl %} hl{% endif %}">
-        <div class="rec-text"><strong>BP {{ v.bp }}</strong> · HR {{ v.hr }} · RR {{ v.rr }} · SpO₂ {{ v.spo2 }} · Temp {{ v.temp }}</div>
+        <div class="rec-text"><strong>BP {{ v.bp }}</strong> · HR {{ v.hr }} · RR {{ v.rr }} · SpO₂ {{ v.spo2 }} · Temp {{ v.temp }}</div>{% if v.get('demonstration') %}
+        <div class="rec-meta" style="font-weight:700; color:#7c2d12;">Demonstration entry — fictional example of split attribution: measured by one clinician, recorded by another.</div>{% endif %}
         {{ attribution(user_meta, roles, v.by, v.at, source=v.source, performed_id=v.get('performed_by'), performed_at=v.get('performed_at'), performed_label="Measured by") }}
     </div>
     {% else %}
@@ -212,7 +213,7 @@
     {% if h.status == "COMPLETED" and h.get('completion') %}
     <div class="rec-entry">
         <div class="rec-text"><strong>Completed — {{ h.event }}</strong></div>
-        <div class="rec-meta">Completed by {{ user_meta.get(h.completion.by|string).name if user_meta.get(h.completion.by|string) else "Unknown" }} · {{ h.completion.role }} · <span class="time" data-time="{{ h.completion.at }}">just now</span>{% if user_meta.get(h.completion.by|string) %} · Staff ID {{ user_meta.get(h.completion.by|string).staff_id_masked }}{% endif %}</div>
+        <div class="rec-meta">Completed by {{ user_meta.get(h.completion.by|string).name if user_meta.get(h.completion.by|string) else "Unknown" }} · {{ h.completion.role }} · <span class="time" data-time="{{ h.completion.at }}">{{ h.completion.at | fmt_ts }}</span>{% if user_meta.get(h.completion.by|string) %} · Staff ID {{ user_meta.get(h.completion.by|string).staff_id_masked }}{% endif %}</div>
         <div class="rec-text" style="margin-top:4px"><strong>Documented outcome:</strong> {{ h.completion.outcome }}</div>
     </div>
     {% else %}
@@ -230,7 +231,7 @@
     {% for item in p.accountability|reverse %}
     <div class="hist-row{% if hl and item.at == hl %} hl{% endif %}">
         <span class="hist-line">{{ item.line }}</span>
-        <span class="hist-meta">{{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "" }}{% if user_meta.get(item.actor) %} · {{ user_meta.get(item.actor).role }} · Staff ID {{ user_meta.get(item.actor).staff_id_masked }}{% endif %} · <span class="time" data-time="{{ item.at }}">just now</span></span>
+        <span class="hist-meta">{{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "" }}{% if user_meta.get(item.actor) %} · {{ user_meta.get(item.actor).role }} · Staff ID {{ user_meta.get(item.actor).staff_id_masked }}{% endif %} · <span class="time" data-time="{{ item.at }}">{{ item.at | fmt_ts }}</span></span>
     </div>
     {% else %}
     <p class="pane-empty">No accountability events yet.</p>

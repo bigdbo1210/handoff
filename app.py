@@ -24,6 +24,7 @@ import json
 import os
 import secrets
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 
@@ -533,6 +534,20 @@ FILTER_LABELS = {
     "COMPLETIONS": "Completion Times",
 }
 
+def fmt_ts_str(iso):
+    """Exact display timestamp: 'Oct 23, 2026 \u00b7 4:57 PM EDT'.
+    Relative time is supplementary only (added client-side); when the
+    source time is missing the honest display is 'Not documented'."""
+    dt = parse_ts(iso)
+    if not dt:
+        return "Not documented"
+    local = dt.astimezone(ZoneInfo("America/New_York"))
+    return local.strftime("%b %d, %Y \u00b7 %I:%M %p ") + (local.tzname() or "")
+
+@app.template_filter("fmt_ts")
+def fmt_ts(iso):
+    return fmt_ts_str(iso)
+
 @app.template_filter("fmt_minutes")
 def fmt_minutes(m):
     if m is None:
@@ -909,26 +924,26 @@ def enrich_disposition(care, case_id, meta):
     stages = [{
         "label": "Intent recorded \u2014 " + ("Intent to admit" if d.get("intent") == "ADMIT" else "Intent to discharge"),
         "state": "done" if ir else "current",
-        "detail": (f"Intended service: {d.get('service', '')}" + (f" \u00b7 By {_who(meta, ir['by'])} \u00b7 {ir['at']}" if ir else "")),
+        "detail": (f"Intended service: {d.get('service', '')}" + (f" \u00b7 By {_who(meta, ir['by'])} \u00b7 {fmt_ts_str(ir['at'])}" if ir else "")),
     }]
     if d.get("intent") == "ADMIT":
         op = d.get("order_placed")
         stages.append({
             "label": "Order placement \u2014 admission order / bed request recorded",
             "state": "done" if op else ("current" if ir else "pending"),
-            "detail": (f"By {_who(meta, op['by'])}" + (f" \u00b7 Entered by {_who(meta, op.get('entered_by'))}" if op.get("entered_by") else "") + f" \u00b7 {op['at']}") if op else "Not yet recorded",
+            "detail": (f"By {_who(meta, op['by'])}" + (f" \u00b7 Entered by {_who(meta, op.get('entered_by'))}" if op.get("entered_by") else "") + f" \u00b7 {fmt_ts_str(op['at'])}") if op else "Not yet recorded",
         })
         ac = d.get("acceptance")
         stages.append({
             "label": "Receiving service acceptance",
             "state": "done" if ac else ("current" if op else "pending"),
-            "detail": (f"Accepted by {ac.get('acceptor_label', '')}" + (f" \u00b7 Recorded by {_who(meta, ac.get('recorded_by'))}" if ac.get("recorded_by") else "") + f" \u00b7 {ac['at']}") if ac else "Pending",
+            "detail": (f"Accepted by {ac.get('acceptor_label', '')}" + (f" \u00b7 Recorded by {_who(meta, ac.get('recorded_by'))}" if ac.get("recorded_by") else "") + f" \u00b7 {fmt_ts_str(ac['at'])}") if ac else "Pending",
         })
     co = d.get("completed")
     stages.append({
         "label": "Completed disposition \u2014 responsibility transferred at sign-off" if d.get("intent") == "ADMIT" else "Completed disposition \u2014 discharge completed",
         "state": "done" if co else "pending",
-        "detail": (f"Signed off by {_who(meta, co.get('signed_off_by'))}" + (f" \u00b7 Responsibility accepted by {_who(meta, co.get('accepted_by'))}" if co.get("accepted_by") else "") + f" \u00b7 {co['at']}") if co else "Not completed",
+        "detail": (f"Signed off by {_who(meta, co.get('signed_off_by'))}" + (f" \u00b7 Responsibility accepted by {_who(meta, co.get('accepted_by'))}" if co.get("accepted_by") else "") + f" \u00b7 {fmt_ts_str(co['at'])}") if co else "Not completed",
     })
     return {"record": d, "stages": stages,
             "responsible_label": _who(meta, d.get("responsible")),

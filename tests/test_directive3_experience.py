@@ -17,6 +17,7 @@ checks pin the approved experience in the application itself:
 Run: python tests/test_directive3_experience.py
 """
 import os
+import re
 import sys
 import tempfile
 
@@ -137,10 +138,22 @@ def main():
     lee_vitals = nina.get("/patient/E90214?section=VITALS").get_data(as_text=True)
     check("Lee vitals separate Measured by from Recorded by",
           "Measured by:" in lee_vitals and "Recorded by" in lee_vitals)
-    check("Lee vitals name the measuring clinician (not the recorder)",
-          ("Measured by: " + meta["4"]["name"]) in lee_vitals
+    check("existing records never carry an assumed performer (Derrick, 2026-10-23)",
+          "Measured by: Not documented" in lee_vitals
+          and ("Measured by: " + meta["4"]["name"]) not in lee_vitals
           and ("Recorded by " + meta["7"]["name"]) in lee_vitals)
     check("Lee vitals carry masked staff IDs", "Staff ID" in lee_vitals)
+    johnson_vitals = nina.get("/patient/A44219?section=VITALS").get_data(as_text=True)
+    check("Johnson's existing sets also show the measurer as Not documented",
+          johnson_vitals.count("Measured by: Not documented") >= 2)
+    check("the split-attribution example is a labeled demonstration entry",
+          "Demonstration entry" in johnson_vitals
+          and ("Measured by: " + meta["8"]["name"]) in johnson_vitals
+          and ("Recorded by " + meta["3"]["name"]) in johnson_vitals)
+    check("clinical times render as exact date + clock time + timezone",
+          re.search(r"[A-Z][a-z]{2} \d{1,2}, \d{4} · \d{1,2}:\d{2} (AM|PM) E[DS]T",
+                    johnson_vitals) is not None
+          and "just now</span>" not in johnson_vitals)
     lee_hist = nina.get("/patient/E90214?section=MEDICAL_HISTORY").get_data(as_text=True)
     check("Lee history credits Nina as recorder", ("Recorded by " + meta["3"]["name"]) in lee_hist)
     check("Lee history honestly shows the obtainer as Not documented",
@@ -180,7 +193,6 @@ def main():
     feed = nina.get("/notifications").get_data(as_text=True)
     check("the simulated alert is clearly labeled",
           "Simulated incoming alert" in feed and "SIMULATION" in feed)
-    import re
     m = re.search(r'href="(/patient/A44219\?section=[A-Z_]+&amp;hl=[^"]*)"', feed)
     check("an exact-record link is present for Johnson", m is not None)
     if m:

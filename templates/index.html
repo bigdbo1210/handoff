@@ -288,17 +288,13 @@
 function formatTimes() {
     document.querySelectorAll('.time').forEach(el => {
         const time = el.getAttribute('data-time');
-        if (time) {
-            const diffMs = new Date() - new Date(time);
-            const diffSeconds = Math.floor(diffMs / 1000);
-            const diffMinutes = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-            if (diffSeconds < 60) el.innerText = "just now";
-            else if (diffMinutes < 60) el.innerText = diffMinutes + " min ago";
-            else if (diffHours < 24) el.innerText = diffHours + " hr ago";
-            else el.innerText = diffDays === 1 ? "1 day ago" : diffDays + " days ago";
-        }
+        if (!time) { el.innerText = "Not documented"; return; }
+        const dt = new Date(time);
+        if (isNaN(dt)) return;
+        const exact = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(dt);
+        const diffMinutes = Math.floor((new Date() - dt) / 60000);
+        const rel = diffMinutes < 1 ? "just now" : diffMinutes < 60 ? diffMinutes + " min ago" : diffMinutes < 1440 ? Math.floor(diffMinutes / 60) + " hr ago" : Math.floor(diffMinutes / 1440) + " day(s) ago";
+        el.innerText = exact + " (" + rel + ")";
     });
 }
 formatTimes();
