@@ -16,7 +16,7 @@ task; following governs only your own landing page.
 Run:  flask --app app run   (or: python app.py)
 Demo logins are listed in DEMO.md. DEMO ONLY — not for real PHI.
 """
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
@@ -214,6 +214,19 @@ SECTION_LABELS = {
     "TASKS": "Care Tasks",
 }
 RECORD_CATEGORY_SECTION = {"LAB": "LABS", "DIAGNOSTIC": "DIAGNOSTICS", "CONSULT": "CONSULTS"}
+# Structured consultation stages (Master Directive \u00a79; Derrick, 2026-10-23).
+# A consultation is tracked stage by stage, each stage with its own actor,
+# recorder, timestamp, and source. Completing a consultation never touches
+# disposition or overall care responsibility.
+CONSULT_STAGES = [
+    ("REQUESTED", "Requested"),
+    ("NOTIFIED", "Service notified"),
+    ("ACKNOWLEDGED", "Acknowledged"),
+    ("PERFORMED", "Performed"),
+    ("RECOMMENDATIONS", "Recommendations documented"),
+    ("REVIEWED", "Reviewed by responsible clinician"),
+    ("SIGNED_OFF", "Consultant signed off"),
+]
 RECORD_CATEGORIES = {"GENERAL", "LAB", "DIAGNOSTIC", "CONSULT"}
 OPEN_STATUSES = {"NEW", "IN_PROGRESS", "ESCALATED"}
 
@@ -687,6 +700,8 @@ def index():
         users=USERS,
         user_meta=meta,
         q=q,
+        can_restore=(str(current_user.role_id) in ORG_WIDE_ROLES
+                     or current_user.username == "njohnson"),
         total_count=len(all_patients(handoffs)),
         notif_unread=notif_unread_count(current_user, handoffs, care, meta),
         state_version=version,
@@ -773,6 +788,21 @@ def board():
 # Screen 2 — Individual patient workspace
 # -----------------------------
 
+def _consult_views(care, case_id):
+    """Structured consultations for one patient, with per-stage rows and a
+    derived status label. A stage that has not happened carries entry=None
+    and renders as 'Not yet recorded' — never back-filled."""
+    out = []
+    for c in (care.get("consults") or {}).get(str(case_id), []):
+        stages = c.get("stages") or {}
+        rows = [{"key": k, "label": lbl, "entry": stages.get(k)} for k, lbl in CONSULT_STAGES]
+        done = [r for r in rows if r["entry"]]
+        out.append({**c, "stage_rows": rows,
+                    "status_label": done[-1]["label"] if done else "Not started",
+                    "next_stage": next((r for r in rows if not r["entry"]), None)})
+    return out
+
+
 def build_patient_view(handoffs, care, user, case_id, meta):
     patients = all_patients(handoffs)
     p = patients.get(str(case_id))
@@ -810,6 +840,7 @@ def build_patient_view(handoffs, care, user, case_id, meta):
         "latest": patient_latest(tasks, meta),
         "disposition": enrich_disposition(care, case_id, meta),
         "snapshot": care["snapshots"].get(str(case_id)) or {},
+        "consults": _consult_views(care, str(case_id)),
         "updates": [i for i in timeline if i["event"] == "RECORD_ADDED"],
         "composer_task_id": (max(tasks, key=lambda h: h.get("updated_at", "")) or {}).get("handoff_id") if tasks else None,
         "is_following": str(case_id) in followed_case_ids(care, user.id),
@@ -1232,11 +1263,25 @@ def disposition_sign_off():
         return "Only the current responsible clinician (or a charge nurse / care coordinator) can sign off", 403
     if new_responsible not in USERS:
         return "Choose the clinician accepting responsibility", 400
-    record["completed"] = {"signed_off_by": str(current_user.id), "accepted_by": new_responsible, "at": now_iso()}
+    summary = (request.form.get("summary") or "").strip()
+    if not summary:
+        return ("A sign-off summary is required \u2014 document the disposition, the receiving "
+                "clinician or service, the acceptance confirmation, completed actions, and "
+                "any outstanding follow-up"), 400
+    if len(summary) > 1000:
+        return "Sign-off summary too long (1000 characters max)", 400
+    meta = user_meta()
+    outstanding = [{"event": h.get("event", ""), "owner": _name_of(meta, h.get("owner"))}
+                   for h in handoffs
+                   if str(h.get("case_id")) == case_id and h.get("status") in OPEN_STATUSES]
+    record["completed"] = {"signed_off_by": str(current_user.id), "accepted_by": new_responsible,
+                           "at": now_iso(), "summary": summary, "outstanding": outstanding}
     record["responsible"] = new_responsible
     add_notification(care, case_id, "TRANSFER_COMPLETE",
-                     "Responsibility transferred at sign-off under institution-approved transfer criteria.",
+                     "Responsibility transferred at sign-off under institution-approved transfer criteria. Sign-off summary documented.",
                      current_user.id, ack_required=True)
+    _file_record(handoffs, case_id, f"Sign-off summary \u2014 {summary}")
+    save_handoffs(handoffs)
     save_care(care)
     flash("Sign-off complete \u2014 responsibility has transferred and the transfer is on the record.")
     return redirect(url_for("patient_page", case_id=case_id))
@@ -1254,10 +1299,23 @@ def disposition_complete():
         return "This disposition is already completed", 400
     if str(current_user.id) != str(record.get("responsible")) and str(current_user.role_id) not in ORG_WIDE_ROLES:
         return "Only the current responsible clinician (or a charge nurse / care coordinator) can complete the discharge", 403
-    record["completed"] = {"signed_off_by": str(current_user.id), "accepted_by": None, "at": now_iso()}
+    summary = (request.form.get("summary") or "").strip()
+    if not summary:
+        return ("A completion summary is required \u2014 document the disposition, completed "
+                "actions, and any outstanding follow-up"), 400
+    if len(summary) > 1000:
+        return "Completion summary too long (1000 characters max)", 400
+    meta = user_meta()
+    outstanding = [{"event": h.get("event", ""), "owner": _name_of(meta, h.get("owner"))}
+                   for h in handoffs
+                   if str(h.get("case_id")) == case_id and h.get("status") in OPEN_STATUSES]
+    record["completed"] = {"signed_off_by": str(current_user.id), "accepted_by": None,
+                           "at": now_iso(), "summary": summary, "outstanding": outstanding}
     add_notification(care, case_id, "DISCHARGE_COMPLETE",
-                     "Discharge completed and recorded by the responsible clinician.",
+                     "Discharge completed and recorded by the responsible clinician. Completion summary documented.",
                      current_user.id)
+    _file_record(handoffs, case_id, f"Discharge completion summary \u2014 {summary}")
+    save_handoffs(handoffs)
     save_care(care)
     flash("Discharge completed and recorded.")
     return redirect(url_for("patient_page", case_id=case_id))
@@ -1788,6 +1846,136 @@ def vitals_amend():
     save_care(care)
     flash("Measurer documented as an amendment — the original entry is preserved.")
     return redirect(url_for("patient_page", case_id=case_id, section="VITALS"))
+
+
+# -----------------------------
+# Structured consultation tracking (Master Directive §9)
+# -----------------------------
+
+@app.route("/consults/request", methods=["POST"])
+@login_required
+def consult_request():
+    case_id = str(request.form.get("case_id") or "")
+    handoffs, care, err = _vitals_guard(case_id)
+    if err:
+        return err
+    service = (request.form.get("service") or "").strip()
+    reason = (request.form.get("reason") or "").strip()
+    if not service or not reason:
+        return "Consultation service and reason are required", 400
+    if len(service) > 120 or len(reason) > 500:
+        return "Consultation service or reason too long", 400
+    ts = now_iso()
+    consult = {
+        "id": datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + secrets.token_hex(2),
+        "service": service, "reason": reason,
+        "stages": {"REQUESTED": {"by": str(current_user.id), "at": ts,
+                                 "source": "Manually entered", "note": reason}},
+    }
+    care.setdefault("consults", {}).setdefault(case_id, []).append(consult)
+    _file_record(handoffs, case_id, f"Consultation requested — {service}: {reason}")
+    save_handoffs(handoffs)
+    save_care(care)
+    flash(f"Consultation requested — {service}. Its stages are tracked on the Consultations tab.")
+    return redirect(url_for("patient_page", case_id=case_id, section="CONSULTS"))
+
+
+@app.route("/consults/stage", methods=["POST"])
+@login_required
+def consult_stage():
+    case_id = str(request.form.get("case_id") or "")
+    handoffs, care, err = _vitals_guard(case_id)
+    if err:
+        return err
+    consult_id = (request.form.get("consult_id") or "").strip()
+    stage = (request.form.get("stage") or "").strip().upper()
+    keys = [k for k, _ in CONSULT_STAGES]
+    if stage not in keys or stage == "REQUESTED":
+        return "Invalid consultation stage", 400
+    consults = (care.get("consults") or {}).get(case_id, [])
+    consult = next((c for c in consults if c.get("id") == consult_id), None)
+    if consult is None:
+        return "Consultation not found", 404
+    stages = consult.setdefault("stages", {})
+    if stage in stages:
+        return "That stage is already recorded — stages are append-only facts", 400
+    idx = keys.index(stage)
+    if any(k not in stages for k in keys[:idx]):
+        return "Consultation stages must be recorded in order — an earlier stage is still unrecorded", 400
+    actor_id = (request.form.get("actor_id") or "").strip()
+    if actor_id and not (actor_id.isdigit() and actor_id in USERS):
+        return "Invalid stage actor", 400
+    actor_label = (request.form.get("actor_label") or "").strip()
+    note = (request.form.get("note") or "").strip()
+    if len(actor_label) > 120 or len(note) > 500:
+        return "Actor label or note too long", 400
+    entry = {"by": str(current_user.id), "at": now_iso(), "source": "Manually entered"}
+    if actor_id:
+        entry["actor_id"] = actor_id
+    if actor_label:
+        entry["actor_label"] = actor_label
+    if note:
+        entry["note"] = note
+    stages[stage] = entry
+    label = dict(CONSULT_STAGES)[stage]
+    text = f"Consultation {label.lower()} — {consult.get('service', '')}"
+    if note:
+        text += f": {note}"
+    _file_record(handoffs, case_id, text)
+    save_handoffs(handoffs)
+    save_care(care)
+    flash(f"Consultation stage recorded — {label}.")
+    return redirect(url_for("patient_page", case_id=case_id, section="CONSULTS"))
+
+
+# -----------------------------
+# UAT testing-session snapshots (Derrick, 2026-10-23)
+# -----------------------------
+# The free UAT service forgets its data when it restarts. A snapshot is a
+# controlled save/restore for the fictional testing world: export it,
+# keep the file, restore it later and every note, task, acknowledgment,
+# and disposition returns exactly as saved. Export is open to any
+# signed-in clinician (fictional data only); restore is limited to
+# unit-wide roles and Nina's reviewer account.
+
+@app.route("/session/export")
+@login_required
+def session_export():
+    payload = {
+        "format": "handoff-uat-snapshot",
+        "version": 1,
+        "exported_at": now_iso(),
+        "exported_by": current_user.username,
+        "handoffs": load_handoffs(),
+        "care": load_care(),
+    }
+    return Response(
+        json.dumps(payload, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=handoff-uat-snapshot.json"},
+    )
+
+
+@app.route("/session/import", methods=["POST"])
+@login_required
+def session_import():
+    if str(current_user.role_id) not in ORG_WIDE_ROLES and current_user.username != "njohnson":
+        return "Snapshot restore is limited to unit-wide roles and the UAT reviewer account", 403
+    f = request.files.get("snapshot")
+    if f is None or not f.filename:
+        return "Choose a snapshot file to restore", 400
+    try:
+        payload = json.loads(f.read().decode("utf-8"))
+    except Exception:
+        return "That file is not a valid snapshot (unreadable JSON)", 400
+    if (not isinstance(payload, dict) or payload.get("format") != "handoff-uat-snapshot"
+            or not isinstance(payload.get("handoffs"), list)
+            or not isinstance(payload.get("care"), dict)):
+        return "That file is not a HANDOFF UAT snapshot", 400
+    save_handoffs(payload["handoffs"])
+    save_care(payload["care"])
+    flash("Testing session restored from snapshot — notes, tasks, and history are back as saved.")
+    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":

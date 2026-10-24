@@ -49,6 +49,17 @@
                 <span class="pill{% if s.state == 'done' %} done{% elif s.state == 'current' %} amber{% endif %}">{{ s.state }}</span>
             </div>
             {% endfor %}
+            {% if d.record.completed and d.record.completed.get('summary') %}
+            <div class="rec-entry" style="margin-top:10px">
+                <div class="rec-text"><strong>{% if d.record.intent == "DISCHARGE" %}Discharge completion summary{% else %}Sign-off summary{% endif %}</strong> — documented by {{ user_meta.get(d.record.completed.signed_off_by, {}).get('name', 'Unknown') }} · <span class="time" data-time="{{ d.record.completed.at }}">{{ d.record.completed.at | fmt_ts }}</span></div>
+                <div class="rec-text" style="margin-top:4px">{{ d.record.completed.summary }}</div>
+                {% if d.record.completed.get('outstanding') %}
+                <div class="rec-meta" style="margin-top:4px">Outstanding at sign-off: {% for o in d.record.completed.outstanding %}{{ o.event }} — owner {{ o.owner }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
+                {% else %}
+                <div class="rec-meta" style="margin-top:4px">Outstanding at sign-off: none recorded.</div>
+                {% endif %}
+            </div>
+            {% endif %}
             <p class="pane-note" style="margin-top:8px">A bed request or a receiving acceptance alone never removes the current clinician's responsibility. Responsibility transfers only at sign-off, when institution-approved transfer criteria are met. Intent, order placement, acceptance, and completed disposition are recorded as separate facts.</p>
             {% set rec = d.record %}
             {% if rec.intent == "ADMIT" and not rec.order_placed %}
@@ -71,12 +82,16 @@
                 <select name="new_responsible" required>
                     {% for uid, u in users.items() %}{% if uid != rec.responsible %}<option value="{{ uid }}">{{ u.role_name }} — {{ u.name }}</option>{% endif %}{% endfor %}
                 </select>
+                <label style="flex-basis:100%">Sign-off summary — the disposition, receiving clinician or service, acceptance confirmation, completed actions, and any outstanding follow-up:
+                    <textarea name="summary" rows="3" maxlength="1000" required style="width:100%"></textarea></label>
                 <button type="submit">Sign off — transfer responsibility</button>
                 <span class="ack-hint">Only the current responsible clinician (or a charge nurse / care coordinator) can sign off, and only after acceptance is recorded.</span>
             </form>
             {% elif rec.intent == "DISCHARGE" and not rec.completed %}
             <form method="POST" action="{{ url_for('disposition_complete') }}" class="action-form">
                 <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <label style="flex-basis:100%">Completion summary — the disposition, completed actions, and any outstanding follow-up:
+                    <textarea name="summary" rows="3" maxlength="1000" required style="width:100%"></textarea></label>
                 <button type="submit">Complete discharge</button>
                 <span class="ack-hint">Recorded by the current responsible clinician (or a charge nurse / care coordinator).</span>
             </form>
@@ -182,6 +197,43 @@
 {% elif active_section in ("LABS", "DIAGNOSTICS", "CONSULTS") %}
     {% set data = p.sections_data[active_section] %}
     <h3 class="pane-title">{{ section_labels[active_section] }}</h3>
+    {% if active_section == "CONSULTS" %}
+    {% for c in p.consults %}
+    <div class="rec-entry">
+        <div class="rec-text"><strong>{{ c.service }}</strong> — {{ c.reason }}</div>
+        <div class="rec-meta">Consultation status: <strong>{{ c.status_label }}</strong> · Consultation tracking is separate from disposition and overall care responsibility.</div>
+        {% for row in c.stage_rows %}
+        <div class="rec-meta" style="margin-top:3px">
+            <strong>{{ row.label }}:</strong>
+            {% if row.entry %}{% set e = row.entry %}{% set actor = user_meta.get(e.get('actor_id') or e.by) %}
+                {{ e.get('actor_label') or (actor.name if actor else 'Unknown') }}{% if actor and not e.get('actor_label') %}, {{ actor.role }} · Staff ID {{ actor.staff_id_masked }}{% endif %}{% if e.get('actor_id') or e.get('actor_label') %} · Recorded by {{ user_meta.get(e.by, {}).get('name', 'Unknown') }}{% endif %}
+                · <span class="time" data-time="{{ e.at }}">{{ e.at | fmt_ts }}</span> · {{ e.source or "Manually entered" }}{% if e.get('note') and row.key != 'REQUESTED' %} · {{ e.note }}{% endif %}
+            {% else %}Not yet recorded{% endif %}
+        </div>
+        {% endfor %}
+        {% if c.next_stage %}
+        <details class="amend-box">
+            <summary>Record next stage: {{ c.next_stage.label }}</summary>
+            <form method="POST" action="{{ url_for('consult_stage') }}" class="action-form">
+                <input type="hidden" name="case_id" value="{{ p.case_id }}">
+                <input type="hidden" name="consult_id" value="{{ c.id }}">
+                <input type="hidden" name="stage" value="{{ c.next_stage.key }}">
+                <label>Stage performed by (if someone other than you):
+                    <select name="actor_id">
+                        <option value="">Me — the signed-in clinician</option>
+                        {% for uid, m in user_meta.items() %}<option value="{{ uid }}">{{ m.name }}</option>{% endfor %}
+                    </select></label>
+                <label>Or external actor (e.g. Cardiology — fellow on call): <input type="text" name="actor_label" maxlength="120"></label>
+                <label>Note: <input type="text" name="note" maxlength="500"></label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+                <button type="submit">Record stage</button>
+            </form>
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
     {% if data.records or data.tasks %}
         {% for item in data.records|reverse %}
         <div class="rec-entry{% if hl and item.at == hl %} hl{% endif %}">
@@ -198,6 +250,23 @@
         {% endfor %}
     {% else %}
         <p class="pane-empty">No {{ section_labels[active_section]|lower }} updates recorded for this patient yet. When one is recorded, it will appear here under the name of the clinician who recorded it.</p>
+    {% endif %}
+    {% if active_section == "CONSULTS" %}
+    <div class="composer">
+        <div class="composer-title">Request a consultation:</div>
+        <form method="POST" action="{{ url_for('consult_request') }}">
+            <input type="hidden" name="case_id" value="{{ p.case_id }}">
+            <div class="composer-row">
+                <label>Service: <input type="text" name="service" maxlength="120" placeholder="e.g. Cardiology" required></label>
+                <label>Reason: <input type="text" name="reason" maxlength="500" placeholder="Why the consultation is needed" required></label>
+            </div>
+            <div class="composer-row">
+                <label class="ack-label"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+                <button type="submit">Request consultation</button>
+            </div>
+        </form>
+    </div>
     {% endif %}
 
 {% elif active_section == "UPDATES" %}

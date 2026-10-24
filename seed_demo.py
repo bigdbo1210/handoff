@@ -75,7 +75,9 @@ def build_seed_care():
                 "order_placed": {"by": "2", "entered_by": "5", "at": t(305)},
                 "acceptance": {"recorded_by": "6", "acceptor_label": "Internal Medicine \u2014 Hospitalist Service",
                                "service": "Internal Medicine", "at": t(210)},
-                "completed": {"signed_off_by": "3", "accepted_by": "2", "at": t(120)},
+                "completed": {"signed_off_by": "3", "accepted_by": "2", "at": t(120),
+                              "summary": "Intent to admit to Internal Medicine (Hospitalist) completed. Acceptance confirmed by the Hospitalist Service (recorded by Jordan Lee, Care Coordinator). Completed actions: GI consultation performed with recommendations reviewed, EGD completed with the bleeding ulcer clipped, 2 units PRBC transfused (hemoglobin 7.1 to 8.9). Outstanding follow-up: repeat hemoglobin in 6 hours, owned by the accepting team.",
+                              "outstanding": [{"event": "Repeat Hgb \u2014 6-Hour Recheck", "owner": "Dr. Williams"}]},
                 "responsible": "2",
             },
         },
@@ -163,6 +165,32 @@ def build_seed_care():
              "at": t(120), "ack_required": True},
         ],
         "notif_state": {},
+        "consults": {
+            "H72410": [{
+                "id": "seed-consult-h72410",
+                "service": "Gastroenterology",
+                "reason": "Acute upper GI bleed, hemoglobin falling",
+                "stages": {
+                    "REQUESTED": {"by": "3", "at": t(510), "source": "Manually entered", "note": "Acute upper GI bleed, hemoglobin falling"},
+                    "NOTIFIED": {"by": "7", "at": t(505), "source": "Manually entered", "note": "GI service paged"},
+                    "ACKNOWLEDGED": {"by": "7", "at": t(495), "source": "Manually entered", "actor_label": "GI service \u2014 fellow on call"},
+                    "PERFORMED": {"by": "2", "at": t(430), "source": "Manually entered", "actor_id": "2", "note": "Bedside evaluation completed"},
+                    "RECOMMENDATIONS": {"by": "2", "at": t(428), "source": "Manually entered", "actor_id": "2", "note": "EGD within 12 hours, continue IV PPI, type & crossmatch 2 units, repeat hemoglobin in 6 hours"},
+                    "REVIEWED": {"by": "3", "at": t(415), "source": "Manually entered", "note": "Reviewed with the responsible clinician; EGD and transfusion tasks opened"},
+                    "SIGNED_OFF": {"by": "2", "at": t(330), "source": "Manually entered", "actor_id": "2"},
+                },
+            }],
+            "A44219": [{
+                "id": "seed-consult-a44219",
+                "service": "Neurology",
+                "reason": "Acute ischemic stroke \u2014 neurology evaluation",
+                "stages": {
+                    "REQUESTED": {"by": "1", "at": t(176), "source": "Manually entered", "note": "Acute ischemic stroke \u2014 neurology evaluation"},
+                    "NOTIFIED": {"by": "5", "at": t(170), "source": "Manually entered", "note": "Neurology service paged"},
+                    "ACKNOWLEDGED": {"by": "5", "at": t(165), "source": "Manually entered", "actor_label": "Neurology \u2014 attending on call"},
+                },
+            }],
+        },
     }
 
 def build_seed_handoffs():

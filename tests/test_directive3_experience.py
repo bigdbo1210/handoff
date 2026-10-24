@@ -16,6 +16,7 @@ checks pin the approved experience in the application itself:
 
 Run: python tests/test_directive3_experience.py
 """
+import io
 import os
 import re
 import sys
@@ -266,6 +267,88 @@ def main():
           "transfused without reaction" in ptask and "bleeding duodenal ulcer treated with clips" in ptask)
     phist = nina.get("/patient/H72410?section=HISTORY").get_data(as_text=True)
     check("journey accountability timeline includes the baton pass", "Baton passed" in phist)
+
+    print("== Sign-off summary display (Patterson + Garcia live flow) ==")
+    pov = nina.get("/patient/H72410?section=OVERVIEW").get_data(as_text=True)
+    check("Patterson's sign-off summary is on the record",
+          "Sign-off summary" in pov and "Acceptance confirmed by the Hospitalist Service" in pov
+          and "Outstanding at sign-off" in pov and "Repeat Hgb" in pov)
+    jlee = login("jlee")
+    r = jlee.post("/disposition/sign-off", data={
+        "case_id": "B77102", "new_responsible": "7",
+        "summary": "Intent to admit to Inpatient Rehabilitation. Acceptance confirmed by Maple Grove Rehab — Admissions. Completed: surgical repair and discharge planning. Outstanding: transport coordination."})
+    check("an org-wide clinician can sign off with a summary", r.status_code == 302)
+    gov = jlee.get("/patient/B77102?section=OVERVIEW").get_data(as_text=True)
+    check("the summary renders in the disposition panel",
+          "Sign-off summary" in gov and "Maple Grove Rehab — Admissions" in gov)
+    gupd = jlee.get("/patient/B77102?section=UPDATES").get_data(as_text=True)
+    check("the summary is filed on the patient's record", "Sign-off summary —" in gupd)
+
+    print("== Structured consultation tracking ==")
+    pcon = nina.get("/patient/H72410?section=CONSULTS").get_data(as_text=True)
+    check("Patterson's GI consult is fully staged through sign-off",
+          "Consultation status:" in pcon and "Consultant signed off" in pcon
+          and "Service notified:" in pcon and "Recommendations documented:" in pcon)
+    check("consult stages carry actor, role, staff ID, and exact time",
+          "GI service — fellow on call" in pcon and "Staff ID" in pcon
+          and re.search(r"[A-Z][a-z]{2} \d{1,2}, \d{4} · \d{1,2}:\d{2} (AM|PM) E[DS]T", pcon))
+    jcon = nina.get("/patient/A44219?section=CONSULTS").get_data(as_text=True)
+    check("Johnson's neurology consult is honestly mid-flight",
+          "Neurology" in jcon and "Not yet recorded" in jcon)
+    r = nina.post("/consults/request", data={
+        "case_id": "E90214", "service": "Cardiology",
+        "reason": "Rule-out pathway — staged tracking test",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("a clinician can request a tracked consultation", r.status_code == 302)
+    lee_con_html = nina.get("/patient/E90214?section=CONSULTS").get_data(as_text=True)
+    check("the requested consult shows its first stage",
+          "Consultation status:" in lee_con_html and "Requested" in lee_con_html)
+    import json as _json
+    care_now = handoff_app.load_care()
+    new_consult = care_now["consults"]["E90214"][-1]
+    cid = new_consult["id"]
+    r = nina.post("/consults/stage", data={
+        "case_id": "E90214", "consult_id": cid, "stage": "PERFORMED",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("stages cannot skip ahead (PERFORMED before NOTIFIED -> 400)", r.status_code == 400)
+    r = nina.post("/consults/stage", data={
+        "case_id": "E90214", "consult_id": cid, "stage": "NOTIFIED",
+        "note": "Cardiology service paged", "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("the next stage records in order", r.status_code == 302)
+    r = nina.post("/consults/stage", data={
+        "case_id": "E90214", "consult_id": cid, "stage": "ACKNOWLEDGED",
+        "actor_label": "Cardiology — fellow on call",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("an external acknowledger is recorded as an actor label", r.status_code == 302)
+    lee_con_html = nina.get("/patient/E90214?section=CONSULTS").get_data(as_text=True)
+    check("the tracker renders the recorded stages with the external actor",
+          "Cardiology — fellow on call" in lee_con_html and "Service notified:" in lee_con_html)
+
+    print("== UAT testing-session snapshots ==")
+    home = nina.get("/").get_data(as_text=True)
+    check("the home page offers session save/restore", "Testing session" in home
+          and "/session/export" in home and "/session/import" in home)
+    williams2 = login("dwilliams")
+    home_w = williams2.get("/").get_data(as_text=True)
+    check("restore is not offered to ordinary accounts", "/session/import" not in home_w
+          and "/session/export" in home_w)
+    r = nina.get("/session/export")
+    check("export returns a snapshot file", r.status_code == 200
+          and "handoff-uat-snapshot" in r.get_data(as_text=True))
+    snap = r.get_data()
+    payload = _json.loads(snap.decode("utf-8"))
+    check("the snapshot carries the whole fictional world",
+          payload["format"] == "handoff-uat-snapshot" and len(payload["handoffs"]) >= 24
+          and "H72410" in payload["care"]["snapshots"])
+    r = williams2.post("/session/import", data={
+        "snapshot": (io.BytesIO(snap), "snap.json")}, content_type="multipart/form-data")
+    check("an ordinary account cannot restore a snapshot (403)", r.status_code == 403)
+    r = nina.post("/session/import", data={
+        "snapshot": (io.BytesIO(snap), "snap.json")}, content_type="multipart/form-data")
+    check("the reviewer can restore her own snapshot", r.status_code == 302)
+    pov2 = nina.get("/patient/H72410?section=OVERVIEW").get_data(as_text=True)
+    check("the world is intact after the restore round-trip",
+          "PATTERSON" in pov2 or "GI bleed" in pov2)
 
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)

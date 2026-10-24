@@ -277,6 +277,21 @@
         </form>
     </details>
 
+    <details class="create-wrap">
+        <summary>Testing session — save or restore (UAT)</summary>
+        <p style="font-size:13px; line-height:1.55;">This test service runs on a free tier that <strong>forgets everything when it restarts</strong>. Protect your testing work: export a snapshot at the end of a session, and restore it next time to pick up exactly where you left off — notes, tasks, acknowledgments, dispositions, and history all return as saved.</p>
+        <p><a href="{{ url_for('session_export') }}"><strong>Export snapshot (.json)</strong></a></p>
+        {% if can_restore %}
+        <form method="POST" action="{{ url_for('session_import') }}" enctype="multipart/form-data" class="action-form">
+            <label>Restore from a snapshot file: <input type="file" name="snapshot" accept=".json,application/json" required></label>
+            <button type="submit">Restore snapshot</button>
+            <span class="ack-hint">Restoring replaces the current fictional dataset with the snapshot's contents.</span>
+        </form>
+        {% else %}
+        <p style="font-size:12.5px; color:#63758c;">Snapshot restore is available to unit-wide roles and the UAT reviewer account.</p>
+        {% endif %}
+    </details>
+
     <button id="updates-pill" type="button">New updates available — tap to refresh</button>
 
     <div class="imprint">

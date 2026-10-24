@@ -132,12 +132,23 @@ def main():
     r = brooks.post("/disposition/sign-off", data={"case_id": "E90214", "new_responsible": "7"})
     check("sign-off by a non-responsible clinician -> 403", r.status_code == 403)
     r = nina.post("/disposition/sign-off", data={"case_id": "E90214", "new_responsible": "7"})
+    check("sign-off without a documented summary -> 400 (Derrick, 2026-10-23)",
+          r.status_code == 400)
+    care = handoff_app.load_care()
+    check("the refused sign-off changed nothing",
+          care["dispositions"]["E90214"]["completed"] is None)
+    r = nina.post("/disposition/sign-off", data={
+        "case_id": "E90214", "new_responsible": "7",
+        "summary": "Intent to admit to Cardiology (telemetry). Acceptance confirmed by the Cardiology attending of record. Completed: consult requested and acknowledged, bed request recorded. Outstanding: cardiology evaluation in progress."})
     check("responsible clinician signs off", r.status_code == 302)
     care = handoff_app.load_care()
     d = care["dispositions"]["E90214"]
     check("sign-off records who signed, who accepted, and completes the disposition",
           d["completed"]["signed_off_by"] == "3" and d["completed"]["accepted_by"] == "7"
           and d["responsible"] == "7")
+    check("sign-off stores the documented summary and the outstanding snapshot",
+          "Acceptance confirmed by the Cardiology attending" in d["completed"]["summary"]
+          and isinstance(d["completed"]["outstanding"], list))
     check("a transfer notification was stored",
           any(n["kind"] == "TRANSFER_COMPLETE" and n["case_id"] == "E90214" for n in care["notifications"]))
 
@@ -147,7 +158,9 @@ def main():
     check("intent to discharge recorded", r.status_code == 302)
     r = nina.post("/disposition/sign-off", data={"case_id": "A44219", "new_responsible": "7"})
     check("admit sign-off route refuses a discharge disposition", r.status_code == 400)
-    r = nina.post("/disposition/complete", data={"case_id": "A44219"})
+    r = nina.post("/disposition/complete", data={
+        "case_id": "A44219",
+        "summary": "Intent to discharge home completed. Completed: stroke workup documented, neurology engaged. Outstanding: none recorded at completion."})
     check("responsible clinician completes the discharge", r.status_code == 302)
     care = handoff_app.load_care()
     check("discharge completion is on the record",
