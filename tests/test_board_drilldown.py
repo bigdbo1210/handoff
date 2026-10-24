@@ -69,12 +69,24 @@ def main():
     print("== Who gets clickable board cards ==")
     for name, client in [("Thompson (charge)", thompson), ("Lee (coordinator)", jlee)]:
         board = client.get("/board").get_data(as_text=True)
-        check(f"{name}: all five board cards are links",
+        check(f"{name}: all six board cards are links",
               all(f"/board?filter={f}" in board for f in
-                  ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS"]))
+                  ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "CANCELED", "COMPLETIONS"]))
     for name, client in [("Nina", nina), ("Williams", williams), ("Carter", carter)]:
         board = client.get("/board").get_data(as_text=True)
-        check(f"{name}: board cards stay display-only", "/board?filter=" not in board)
+        check(f"{name}: board cards are links too (everything clickable)",
+              all(f"/board?filter={f}" in board for f in
+                  ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "CANCELED", "COMPLETIONS"]))
+
+    print("== Non-unit-wide drill-down stays inside the clinician's universe ==")
+    page = nina.get("/board?filter=ESCALATED").get_data(as_text=True)
+    check("Nina's ESCALATED drill-down counts only her universe (1 task / 1 patient)",
+          header_counts(page) == (1, 1))
+    check("her escalated patient is grouped", "LEWIS, D" in page)
+    check("patients outside her universe stay out",
+          "PATEL, R" not in page and "GARCIA, L" not in page)
+    check("scope is labeled as her authorized patients only",
+          "your authorized patients only" in page)
 
     print("== The drill-down itself ==")
     page = thompson.get("/board?filter=ESCALATED").get_data(as_text=True)
@@ -91,7 +103,7 @@ def main():
           'class="column escalated"' not in page)
 
     totals = {"NEW": (5, 5), "IN_PROGRESS": (9, 9), "ESCALATED": (3, 3),
-              "COMPLETED": (3, 3)}
+              "COMPLETED": (3, 3), "CANCELED": (0, 0)}
     for f, want in totals.items():
         got = header_counts(thompson.get(f"/board?filter={f}").get_data(as_text=True))
         check(f"board filter {f}: counts agree with the board's own cards ({want[0]} tasks)",
@@ -103,13 +115,13 @@ def main():
     check("completed rows carry durations and history links",
           "1 h 54 min" in page and "/patient/D55231?section=HISTORY" in page)
 
-    print("== Regular clinicians gain nothing from the URL ==")
+    print("== Regular clinicians drill in too — scoped to their universe ==")
     for name, client in [("Nina", nina), ("Williams", williams)]:
         page = client.get("/board?filter=ESCALATED").get_data(as_text=True)
-        check(f"{name}: filter not honored — no grouped view", header_counts(page) is None)
-        check(f"{name}: the plain board still renders", 'class="column escalated"' in page)
+        check(f"{name}: filter honored — grouped view renders", header_counts(page) is not None)
+        check(f"{name}: the columns step aside while filtered", 'class="column escalated"' not in page)
         page = client.get("/board?filter=COMPLETIONS").get_data(as_text=True)
-        check(f"{name}: no breakdown either", 'class="stat-tile"' not in page)
+        check(f"{name}: completion breakdown opens (scoped)", "Completion Times" in page)
     check("Nina's workspace access is unchanged (LEWIS baton view, JOHNSON ok)",
           nina.get("/patient/A44219").status_code == 200)
     check("an unauthorized workspace is still 403",
@@ -118,7 +130,7 @@ def main():
     print("== Navigation only; search still wins; board cards work ==")
     before = snapshot()
     for client in (thompson, jlee, nina):
-        for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS", "BOGUS"]:
+        for f in ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "CANCELED", "COMPLETIONS", "BOGUS"]:
             client.get(f"/board?filter={f}")
     check("no status, owner, acknowledgment, or history changed", snapshot() == before)
     page = thompson.get("/board?filter=BOGUS").get_data(as_text=True)

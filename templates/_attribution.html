@@ -1,0 +1,27 @@
+{# Shared clinical attribution component (Directive 3.0 accountability
+   standard, restored 2026-10-23). Every clinical entry renders through
+   this one macro so the performer/recorder distinction cannot drift
+   between screens:
+     - Performed / measured / obtained by: the clinician who did the
+       clinical activity, with role and masked staff ID — or an explicit
+       "Not documented" when the record does not carry it. The recorder
+       is NEVER silently presented as the performer.
+     - Recorded by: the authenticated person who entered it, with role,
+       recorded time, entry source, and masked staff ID.
+     - Origin (history-type entries): patient-reported, caregiver-
+       reported, chart-derived, verified — or "Not documented". #}
+{% macro attribution(user_meta, roles, recorded_id, recorded_at, source=None, performed_id=None, performed_at=None, performed_label="Performed by", origin=None, show_origin=False) %}
+<div class="attr-block">
+    {% if performed_id and user_meta.get(performed_id|string) %}
+    {% set pm = user_meta.get(performed_id|string) %}
+    <div class="rec-meta">{{ performed_label }}: {{ pm.name }}, {{ pm.role }}{% if performed_at %} · <span class="time" data-time="{{ performed_at }}">just now</span>{% endif %} · Staff ID {{ pm.staff_id_masked }}</div>
+    {% else %}
+    <div class="rec-meta">{{ performed_label }}: Not documented</div>
+    {% endif %}
+    {% set rm = user_meta.get(recorded_id|string) %}
+    <div class="rec-meta">Recorded by {{ rm.name if rm else "Unknown" }}, {{ rm.role if rm else "" }} · <span class="time" data-time="{{ recorded_at }}">just now</span>{% if source %} · {{ source }}{% endif %}{% if rm %} · Staff ID {{ rm.staff_id_masked }}{% endif %}</div>
+    {% if show_origin %}
+    <div class="rec-meta">Information source: {{ origin if origin else "Not documented" }}</div>
+    {% endif %}
+</div>
+{% endmacro %}

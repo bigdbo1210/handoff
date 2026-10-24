@@ -102,6 +102,11 @@ def initials_of(name):
         return parts[0][:2].upper()
     return (parts[0][0] + parts[-1][0]).upper()
 
+# Fictional demo badge numbers. Only the masked form (last two digits)
+# is ever displayed, as the Directive 3.0 attribution standard requires.
+STAFF_BADGES = {"1": "4417", "2": "2290", "3": "4821", "4": "3355",
+                "5": "5108", "6": "6742", "7": "7819", "8": "9024"}
+
 def user_meta():
     """Display metadata per user id: name, role, avatar initials + color."""
     return {
@@ -110,6 +115,7 @@ def user_meta():
             "role": u.role_name,
             "initials": initials_of(u.name),
             "color": _AVATAR_COLORS[(int(uid) - 1) % len(_AVATAR_COLORS)],
+            "staff_id_masked": "\u2022\u2022" + STAFF_BADGES.get(str(uid), "00")[-2:],
         }
         for uid, u in USERS.items()
     }
@@ -463,7 +469,7 @@ def enrich(handoff):
     return handoff
 
 def compute_metrics(handoffs):
-    metrics = {"NEW": 0, "IN_PROGRESS": 0, "ESCALATED": 0, "COMPLETED": 0, "stale": 0}
+    metrics = {"NEW": 0, "IN_PROGRESS": 0, "ESCALATED": 0, "COMPLETED": 0, "CANCELED": 0, "stale": 0}
     completion_minutes = []
     for h in handoffs:
         metrics[h["status"]] = metrics.get(h["status"], 0) + 1
@@ -517,12 +523,13 @@ def patient_summaries(handoffs, care, user, meta):
 # categories. The inactivity / Tasks Overdue category was removed entirely by
 # Derrick + Nina's decision (2026-10-23): no stale filter, no inactivity
 # flags — elapsed time alone never marks a task.
-STATUS_FILTERS = {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "COMPLETIONS"}
+STATUS_FILTERS = {"NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "CANCELED", "COMPLETIONS"}
 FILTER_LABELS = {
     "NEW": "New",
     "IN_PROGRESS": "In Progress",
     "ESCALATED": "Escalated",
     "COMPLETED": "Completed",
+    "CANCELED": "Canceled",
     "COMPLETIONS": "Completion Times",
 }
 
@@ -582,9 +589,10 @@ def build_worklist(handoffs, care, user, meta, q="", active_filter=None, unit_sc
     unit-wide numbers.)"""
     summaries = patient_summaries(handoffs, care, user, meta)
     if unit_scope:
-        # Operations Board drill-down scope: the whole unit. The board
-        # route only honors a filter for unit-wide roles, and the patient
-        # workspace behind every link still enforces membership itself.
+        # Operations Board drill-down scope for unit-wide roles: the
+        # whole unit. Other clinicians drill into their authorized
+        # patients only (unit_scope=False), and the patient workspace
+        # behind every link still enforces membership itself.
         authorized_all = list(summaries)
     else:
         authorized_all = [p for p in summaries if p["can_view"]]
@@ -721,19 +729,25 @@ def board():
                     fields += [m["name"], m["role"]]
             return identifier_match(h, needle) or any(needle in str(f).lower() for f in fields)
         handoffs = [h for h in all_handoffs if matches(h)]
-    can_drill = unit_wide_access(current_user)
+    # Every board card is clickable for every clinician (Derrick's
+    # directive, 2026-10-23: "we made everything clickable"). What a
+    # clinician drills INTO stays scoped: unit-wide roles see the whole
+    # board; everyone else drills into their authorized patients only -
+    # the same universe their board already shows.
+    unit_wide = unit_wide_access(current_user)
+    can_drill = True
     board_filter = (request.args.get("filter") or "").upper() or None
-    if not can_drill or q:
+    if q:
         board_filter = None
     ctx = {}
     if board_filter in STATUS_FILTERS or board_filter == "COMPLETIONS":
         ctx = build_worklist(raw, care, current_user, meta,
-                             active_filter=board_filter, unit_scope=True)
+                             active_filter=board_filter, unit_scope=unit_wide)
     else:
         board_filter = None
     kwargs = dict(handoffs=handoffs, roles=display_roles(), users=USERS,
                   metrics=metrics, user_meta=meta, q=q, total_count=len(all_handoffs),
-                  user=str(current_user.id), can_drill=can_drill,
+                  user=str(current_user.id), can_drill=can_drill, unit_wide=unit_wide,
                   notif_unread=notif_unread_count(current_user, raw, care, meta),
                   board_filter=board_filter, section_labels=SECTION_LABELS,
                   filter_labels=FILTER_LABELS)
@@ -1609,7 +1623,7 @@ def add_note():
         return "Two patient identifiers must be confirmed before documenting care", 400
 
     ts = now_iso()
-    target["history"].append({
+    entry = {
         "at": ts,
         "event": "RECORD_ADDED",
         "type": note_type,
@@ -1617,7 +1631,14 @@ def add_note():
         "text": text,
         "by": int(current_user.id),
         "id_confirmed": True,
-    })
+    }
+    performed_by = (request.form.get("performed_by") or "").strip()
+    if performed_by.isdigit() and performed_by in USERS:
+        # The recorder explicitly identified who performed the activity;
+        # it is stored as its own fact, never merged with the recorder.
+        entry["performed_by"] = performed_by
+        entry["performed_at"] = ts
+    target["history"].append(entry)
     target["updated_at"] = ts
 
     save_handoffs(handoffs)

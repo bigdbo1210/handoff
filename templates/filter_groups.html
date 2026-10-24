@@ -13,7 +13,7 @@
             <div class="patient-id">
                 {% if p.unread %}<span class="unread-dot" title="Unread updates"></span>{% endif %}
                 <a class="patient-name" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">{{ p.patient_name }}</a>
-                <span class="patient-meta">Case: {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
+                <span class="patient-meta">{% if p.dob %}DOB {{ p.dob }} · {% endif %}{% if p.mrn %}MRN {{ p.mrn }} · {% endif %}Case: {{ p.case_id }}{% if p.age %} · {{ p.age }} y/o{% endif %}{% if p.sex %} · {{ p.sex }}{% endif %}{% if p.context %} · {{ p.context }}{% endif %}</span>
             </div>
             <a class="open-btn" href="{{ url_for('patient_page', case_id=p.case_id, section=g.section) }}">Open Patient →</a>
         </div>

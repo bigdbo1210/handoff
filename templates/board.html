@@ -66,8 +66,9 @@
         .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
         .card-title { font-size: 14.5px; font-weight: bold; color: #10233c; }
         .card-dots { color: #a7b3c2; font-size: 13px; letter-spacing: 1px; }
-        .card-case { font-size: 12px; color: #63758c; margin-top: 2px; }
-        .card-patient { font-size: 12.5px; color: #3c4a5c; margin-top: 3px; letter-spacing: 0.3px; }
+        .card-patient { font-size: 13.5px; font-weight: 700; color: #10233c; margin-top: 4px; letter-spacing: 0.3px; }
+        .card-ident { font-size: 12px; color: #3c4a5c; margin-top: 2px; }
+        .card-case { font-size: 11px; color: #8496ad; margin-top: 2px; }
         .card-meta { margin-top: 9px; }
         .pill { display: inline-block; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 11px; background: #e8f0fe; color: #174ea6; }
         .pill.amber { background: #fef7e0; color: #9a6a00; }
@@ -203,6 +204,7 @@
         {% if can_drill %}<a class="metric{% if board_filter == 'IN_PROGRESS' %} active{% endif %}" href="{{ url_for('board', filter='IN_PROGRESS') }}"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">In Progress</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></a>{% else %}<div class="metric"><div><div class="num">{{ metrics.IN_PROGRESS }}</div><div class="lbl">In Progress</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></div></div>{% endif %}
         {% if can_drill %}<a class="metric alert{% if board_filter == 'ESCALATED' %} active{% endif %}" href="{{ url_for('board', filter='ESCALATED') }}"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">Escalated</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></a>{% else %}<div class="metric alert"><div><div class="num">{{ metrics.ESCALATED }}</div><div class="lbl">Escalated</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><path d="M12 3 2.5 20.5h19z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.6" fill="#d93025"/></svg></div></div>{% endif %}
         {% if can_drill %}<a class="metric{% if board_filter == 'COMPLETED' %} active{% endif %}" href="{{ url_for('board', filter='COMPLETED') }}"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">Completed</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></a>{% else %}<div class="metric"><div><div class="num">{{ metrics.COMPLETED }}</div><div class="lbl">Completed</div></div><div class="icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#188038" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M8 12.5 11 15.5 16.5 9"/></svg></div></div>{% endif %}
+        {% if can_drill %}<a class="metric{% if board_filter == 'CANCELED' %} active{% endif %}" href="{{ url_for('board', filter='CANCELED') }}"><div><div class="num">{{ metrics.CANCELED }}</div><div class="lbl">Canceled</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div></a>{% else %}<div class="metric"><div><div class="num">{{ metrics.CANCELED }}</div><div class="lbl">Canceled</div></div><div class="icon red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div></div>{% endif %}
         {% if can_drill %}<a class="metric{% if board_filter == 'COMPLETIONS' %} active{% endif %}" href="{{ url_for('board', filter='COMPLETIONS') }}"><div><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></a>{% else %}<div class="metric"><div><div class="num">{{ metrics.avg_completion if metrics.avg_completion is not none else '—' }}{% if metrics.avg_completion is not none %} min{% endif %}</div><div class="lbl">Avg Completion</div></div><div class="icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><circle cx="12" cy="12" r="9.2"/><path d="M12 7v5.2l3.4 2"/></svg></div></div>{% endif %}
     </div>
 
@@ -210,7 +212,7 @@
     <div class="back-bar"><a href="{{ url_for('board') }}">&larr; Back to the full Operations Board</a></div>
     <div class="drill-wrap">
     {% set clear_url = url_for('board') %}
-    {% set scope_note = "unit-wide — all patients on this board" %}
+    {% set scope_note = "unit-wide — all patients on this board" if unit_wide else "your authorized patients only" %}
     {% if filter_kind == "status" %}{% include "filter_groups.html" %}{% elif filter_kind == "completions" %}{% include "completion_breakdown.html" %}{% endif %}
     </div>
     {% endif %}

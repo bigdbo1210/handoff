@@ -118,6 +118,57 @@ def main():
     upd = nina.get("/patient/A44219?section=UPDATES").get_data(as_text=True)
     check("the gated update lands in Care-Team Updates", "Family updated at bedside" in upd)
 
+    print("== Board cards lead with name + DOB/MRN; case is secondary ==")
+    tasks_page = nina.get("/patient/A44219?section=TASKS").get_data(as_text=True)
+    check("the task card names the patient first", "JOHNSON, M" in tasks_page)
+    check("DOB and MRN ride the card", "DOB 07/02/1955" in tasks_page and "MRN 7712045" in tasks_page)
+    check("the case id is demoted to an internal reference",
+          "Case A44219 \u00b7 internal reference" in tasks_page)
+    board = nina.get("/board").get_data(as_text=True)
+    check("every board box is clickable for Nina, Canceled included",
+          all(f"/board?filter={f}" in board for f in
+              ["NEW", "IN_PROGRESS", "ESCALATED", "COMPLETED", "CANCELED", "COMPLETIONS"]))
+    canceled = nina.get("/board?filter=CANCELED").get_data(as_text=True)
+    check("the Canceled box filters (0 canceled in her universe, honestly)",
+          "0 tasks" in canceled or "0 task" in canceled)
+
+    print("== Attribution: performer and recorder are never merged ==")
+    meta = handoff_app.user_meta()
+    lee_vitals = nina.get("/patient/E90214?section=VITALS").get_data(as_text=True)
+    check("Lee vitals separate Measured by from Recorded by",
+          "Measured by:" in lee_vitals and "Recorded by" in lee_vitals)
+    check("Lee vitals name the measuring clinician (not the recorder)",
+          ("Measured by: " + meta["4"]["name"]) in lee_vitals
+          and ("Recorded by " + meta["7"]["name"]) in lee_vitals)
+    check("Lee vitals carry masked staff IDs", "Staff ID" in lee_vitals)
+    lee_hist = nina.get("/patient/E90214?section=MEDICAL_HISTORY").get_data(as_text=True)
+    check("Lee history credits Nina as recorder", ("Recorded by " + meta["3"]["name"]) in lee_hist)
+    check("Lee history honestly shows the obtainer as Not documented",
+          "Obtained by: Not documented" in lee_hist)
+    check("Lee history honestly shows the information source as Not documented",
+          "Information source: Not documented" in lee_hist)
+    moore_hist = thompson.get("/patient/F31407?section=MEDICAL_HISTORY").get_data(as_text=True)
+    check("Moore history carries its documented origin (caregiver-reported)",
+          "Information source: Caregiver-reported" in moore_hist)
+    labs = thompson.get("/patient/G20817?section=LABS").get_data(as_text=True)
+    diag = nina.get("/patient/A44219?section=DIAGNOSTICS").get_data(as_text=True)
+    check("record entries render through the shared attribution component",
+          "attr-block" in labs and "attr-block" in diag and "attr-block" in lee_vitals)
+    check("seeded lab records show performer Not documented (never assumed)",
+          "Performed by: Not documented" in labs)
+    acct = nina.get("/patient/A44219?section=HISTORY").get_data(as_text=True)
+    check("accountability rows carry role + masked staff ID",
+          "Staff ID" in acct and meta["1"]["role"] in acct)
+    r = nina.post("/add-note", data={"handoff_id": hid, "text": "Repeat vitals taken at bedside",
+                                     "note_type": "UPDATE", "category": "GENERAL",
+                                     "performed_by": "8",
+                                     "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("a note can explicitly name its performer (302)", r.status_code == 302)
+    upd = nina.get("/patient/A44219?section=UPDATES").get_data(as_text=True)
+    check("the named performer renders separately from the recorder",
+          ("Performed by: " + meta["8"]["name"]) in upd
+          and ("Recorded by " + meta["3"]["name"]) in upd)
+
     print("== Notifications: deep links + Simulate ==")
     feed = nina.get("/notifications").get_data(as_text=True)
     check("alerts deep-link to a section with a highlight target",

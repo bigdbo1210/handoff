@@ -1,6 +1,7 @@
 {# Tab bar + section panes for Screen 2 — the approved Directive 3.0
    workspace: ten sections, one patient at a time. Shared by the patient
    page and the refresh fragment. #}
+{% from "_attribution.html" import attribution %}
 {% set tab_labels = {"OVERVIEW": "Overview", "HPI": "HPI", "MEDICAL_HISTORY": "Medical History", "VITALS": "Vitals", "LABS": "Labs", "DIAGNOSTICS": "Diagnostics / Imaging", "CONSULTS": "Consultations", "UPDATES": "Care-Team Updates", "TASKS": "Pending Tasks", "HISTORY": "Activity & Accountability"} %}
 <div class="tabs" role="tablist">
     {% for sec in ["OVERVIEW", "HPI", "MEDICAL_HISTORY", "VITALS", "LABS", "DIAGNOSTICS", "CONSULTS", "UPDATES", "TASKS", "HISTORY"] %}
@@ -16,7 +17,7 @@
     <h3 class="pane-title">Overview</h3>
     {% if p.context %}<p style="font-size:14.5px; line-height:1.6; max-width:700px;"><strong>{{ p.context }}</strong>{% if p.snapshot.overview %} — {{ p.snapshot.overview[0].text }}{% endif %}</p>{% endif %}
     {% for e in p.snapshot.overview or [] %}
-    <div class="rec-meta">Recorded by {{ user_meta.get(e.by).name if user_meta.get(e.by) else "Unknown" }}, {{ roles.get(e.by, "") }} · <span class="time" data-time="{{ e.at }}">just now</span> · {{ e.source }}</div>
+    {{ attribution(user_meta, roles, e.by, e.at, source=e.source, performed_id=e.get('performed_by'), performed_at=e.get('performed_at')) }}
     {% endfor %}
     {% if p.latest %}
     <p class="pane-note" style="margin-top:10px">Latest activity: <a href="{{ url_for('patient_page', case_id=p.case_id, section=p.latest.section) }}">{{ p.latest.line }}</a> · <span class="time" data-time="{{ p.latest.at }}">just now</span></p>
@@ -95,7 +96,7 @@
     {% for e in p.snapshot.hpi or [] %}
     <div class="rec-entry">
         <div class="rec-text">{{ e.text }}</div>
-        <div class="rec-meta">Recorded by {{ user_meta.get(e.by).name if user_meta.get(e.by) else "Unknown" }}, {{ roles.get(e.by, "") }} · <span class="time" data-time="{{ e.at }}">just now</span> · {{ e.source }}</div>
+        {{ attribution(user_meta, roles, e.by, e.at, source=e.source, performed_id=e.get('performed_by'), performed_at=e.get('performed_at'), performed_label="Obtained by", origin=e.get('origin'), show_origin=True) }}
     </div>
     {% else %}
     <p class="pane-empty">No history of present illness has been recorded for this patient in this demonstration record. When a clinician records it, it appears here with their name and the source of the entry.</p>
@@ -106,7 +107,7 @@
     {% for e in p.snapshot.medical_history or [] %}
     <div class="rec-entry">
         <div class="rec-text">{{ e.text }}</div>
-        <div class="rec-meta">Recorded by {{ user_meta.get(e.by).name if user_meta.get(e.by) else "Unknown" }}, {{ roles.get(e.by, "") }} · <span class="time" data-time="{{ e.at }}">just now</span> · {{ e.source }}</div>
+        {{ attribution(user_meta, roles, e.by, e.at, source=e.source, performed_id=e.get('performed_by'), performed_at=e.get('performed_at'), performed_label="Obtained by", origin=e.get('origin'), show_origin=True) }}
     </div>
     {% else %}
     <p class="pane-empty">No past medical history has been recorded for this patient in this demonstration record.</p>
@@ -114,11 +115,11 @@
 
 {% elif active_section == "VITALS" %}
     <h3 class="pane-title">Vitals</h3>
-    <p class="pane-note">Recorded vital-sign sets with the clinician who performed them. Handoff displays recorded values; it does not interpret them.</p>
+    <p class="pane-note">Recorded vital-sign sets. Who measured them and who recorded them are shown separately — the two are never merged. Handoff displays recorded values; it does not interpret them.</p>
     {% for v in p.snapshot.vitals or [] %}
-    <div class="task-line{% if hl and v.at == hl %} hl{% endif %}">
-        <span class="task-line-main"><strong>BP {{ v.bp }}</strong> · HR {{ v.hr }} · RR {{ v.rr }} · SpO₂ {{ v.spo2 }} · Temp {{ v.temp }}</span>
-        <span class="task-line-owner">{{ user_meta.get(v.by).name if user_meta.get(v.by) else "Unknown" }}, {{ roles.get(v.by, "") }} · <span class="time" data-time="{{ v.at }}">just now</span> · {{ v.source }}</span>
+    <div class="rec-entry{% if hl and v.at == hl %} hl{% endif %}">
+        <div class="rec-text"><strong>BP {{ v.bp }}</strong> · HR {{ v.hr }} · RR {{ v.rr }} · SpO₂ {{ v.spo2 }} · Temp {{ v.temp }}</div>
+        {{ attribution(user_meta, roles, v.by, v.at, source=v.source, performed_id=v.get('performed_by'), performed_at=v.get('performed_at'), performed_label="Measured by") }}
     </div>
     {% else %}
     <p class="pane-empty">No vital signs have been recorded for this patient in this demonstration record.</p>
@@ -131,7 +132,8 @@
         {% for item in data.records|reverse %}
         <div class="rec-entry{% if hl and item.at == hl %} hl{% endif %}">
             <div class="rec-text">{{ item.text }}</div>
-            <div class="rec-meta">Recorded by {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span> · Entered manually{% if item.get('id_confirmed') %} · Two patient identifiers confirmed{% endif %}</div>
+            {{ attribution(user_meta, roles, item.actor, item.at, source="Entered manually", performed_id=item.get('performed_by'), performed_at=item.get('performed_at')) }}
+            {% if item.get('id_confirmed') %}<div class="rec-meta">Two patient identifiers confirmed before documenting</div>{% endif %}
         </div>
         {% endfor %}
         {% for h in data.tasks %}
@@ -158,6 +160,12 @@
             <label style="font-weight:normal"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
         </div>
         <div class="note-row">
+            <select name="performed_by">
+                <option value="">Performed by: Not documented</option>
+                {% for uid, m in user_meta.items() %}<option value="{{ uid }}">Performed by: {{ m.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="note-row">
             <select name="note_type">
                 <option value="NOTE">Note</option>
                 <option value="ORDER">Order</option>
@@ -176,7 +184,9 @@
     {% for item in p.updates|reverse %}
     <div class="rec-entry{% if hl and item.at == hl %} hl{% endif %}">
         <div class="rec-text">{{ item.text }}</div>
-        <div class="rec-meta">{{ item.type|title }} · {{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "Unknown" }}, {{ roles.get(item.actor, "") }} · <span class="time" data-time="{{ item.at }}">just now</span>{% if item.get('category') and item.category != "GENERAL" %} · {{ item.category|title }}{% endif %}{% if item.get('id_confirmed') %} · Two patient identifiers confirmed{% endif %}</div>
+        <div class="rec-meta">{{ item.type|title }}{% if item.get('category') and item.category != "GENERAL" %} · {{ item.category|title }}{% endif %}</div>
+        {{ attribution(user_meta, roles, item.actor, item.at, source="Entered manually", performed_id=item.get('performed_by'), performed_at=item.get('performed_at')) }}
+        {% if item.get('id_confirmed') %}<div class="rec-meta">Two patient identifiers confirmed before documenting</div>{% endif %}
     </div>
     {% else %}
     <p class="pane-empty">No care-team updates recorded yet for this patient.</p>
@@ -202,7 +212,7 @@
     {% if h.status == "COMPLETED" and h.get('completion') %}
     <div class="rec-entry">
         <div class="rec-text"><strong>Completed — {{ h.event }}</strong></div>
-        <div class="rec-meta">Completed by {{ user_meta.get(h.completion.by|string).name if user_meta.get(h.completion.by|string) else "Unknown" }} · {{ h.completion.role }} · <span class="time" data-time="{{ h.completion.at }}">just now</span></div>
+        <div class="rec-meta">Completed by {{ user_meta.get(h.completion.by|string).name if user_meta.get(h.completion.by|string) else "Unknown" }} · {{ h.completion.role }} · <span class="time" data-time="{{ h.completion.at }}">just now</span>{% if user_meta.get(h.completion.by|string) %} · Staff ID {{ user_meta.get(h.completion.by|string).staff_id_masked }}{% endif %}</div>
         <div class="rec-text" style="margin-top:4px"><strong>Documented outcome:</strong> {{ h.completion.outcome }}</div>
     </div>
     {% else %}
@@ -220,7 +230,7 @@
     {% for item in p.accountability|reverse %}
     <div class="hist-row{% if hl and item.at == hl %} hl{% endif %}">
         <span class="hist-line">{{ item.line }}</span>
-        <span class="hist-meta">{{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "" }} · <span class="time" data-time="{{ item.at }}">just now</span></span>
+        <span class="hist-meta">{{ user_meta.get(item.actor).name if user_meta.get(item.actor) else "" }}{% if user_meta.get(item.actor) %} · {{ user_meta.get(item.actor).role }} · Staff ID {{ user_meta.get(item.actor).staff_id_masked }}{% endif %} · <span class="time" data-time="{{ item.at }}">just now</span></span>
     </div>
     {% else %}
     <p class="pane-empty">No accountability events yet.</p>

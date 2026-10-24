@@ -4,8 +4,15 @@
     <div class="card-title">{{ h.event }}</div>
     <div class="card-dots">•••</div>
 </div>
-<div class="card-case">Case {{ h.case_id }}</div>
-<div class="card-patient">{{ h.patient_name }}{% if h.age %} &nbsp;|&nbsp; {{ h.age }} y/o{% endif %}{% if h.sex %} &nbsp;|&nbsp; {{ h.sex }}{% endif %}</div>
+<div class="card-patient">{{ h.patient_name }}</div>
+{% set id_parts = [] %}
+{% if h.dob %}{% set _ = id_parts.append("DOB " + h.dob) %}{% endif %}
+{% if h.mrn %}{% set _ = id_parts.append("MRN " + h.mrn) %}{% endif %}
+{% if h.fin %}{% set _ = id_parts.append("FIN " + h.fin) %}{% endif %}
+{% if h.age %}{% set _ = id_parts.append(h.age|string + " y/o") %}{% endif %}
+{% if h.sex %}{% set _ = id_parts.append(h.sex) %}{% endif %}
+{% if id_parts %}<div class="card-ident">{{ id_parts|join(" · ") }}</div>{% endif %}
+<div class="card-case">Case {{ h.case_id }} · internal reference</div>
 
 {% set sec_labels = {"LABS": "Labs", "DIAGNOSTICS": "Diagnostics / Imaging", "CONSULTS": "Consultations", "TASKS": "Care Tasks"} %}
 {% set open_task = h.status not in ("COMPLETED", "CANCELED") %}
@@ -110,6 +117,12 @@
         <label style="font-weight:normal"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
     </div>
     <div class="ack-hint">Two patient identifiers must be confirmed before documenting care.</div>
+    <div class="note-row">
+        <select name="performed_by">
+            <option value="">Performed by: Not documented</option>
+            {% for uid, m in user_meta.items() %}<option value="{{ uid }}">Performed by: {{ m.name }}</option>{% endfor %}
+        </select>
+    </div>
     <div class="note-row">
         <select name="note_type">
             <option value="NOTE">Note</option>
