@@ -350,6 +350,63 @@ def main():
     check("the world is intact after the restore round-trip",
           "PATTERSON" in pov2 or "GI bleed" in pov2)
 
+    print("== HPI / Medical History documentation controls ==")
+    lee_hpi = nina.get("/patient/E90214?section=HPI").get_data(as_text=True)
+    check("the HPI pane offers a real entry form", 'action="/history/add"' in lee_hpi)
+    r = nina.post("/history/add", data={
+        "case_id": "E90214", "kind": "HPI",
+        "text": "Chest tightness now resolved at rest; episodes remain exertional."})
+    check("documenting an HPI without two identifiers is refused (400)", r.status_code == 400)
+    r = nina.post("/history/add", data={
+        "case_id": "E90214", "kind": "HPI",
+        "text": "Chest tightness now resolved at rest; episodes remain exertional.",
+        "obtained_by": "8", "origin": "Patient-reported",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("an authorized clinician can document an HPI entry", r.status_code == 302)
+    lee_hpi = nina.get("/patient/E90214?section=HPI").get_data(as_text=True)
+    check("the HPI entry carries obtained-by and source",
+          "episodes remain exertional" in lee_hpi and "Patient-reported" in lee_hpi
+          and ("Obtained by: " + meta["8"]["name"]) in lee_hpi)
+    r = nina.post("/history/add", data={
+        "case_id": "E90214", "kind": "MEDICAL_HISTORY",
+        "text": "Seasonal allergies — no drug allergies documented.",
+        "obtained_by": "", "origin": "Caregiver-reported",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("an authorized clinician can document a history entry", r.status_code == 302)
+    lee_mh = nina.get("/patient/E90214?section=MEDICAL_HISTORY").get_data(as_text=True)
+    check("the history entry renders with its source",
+          "Seasonal allergies" in lee_mh and "Caregiver-reported" in lee_mh)
+    r = williams.post("/history/add", data={
+        "case_id": "E90214", "kind": "HPI", "text": "Should not land.",
+        "id_confirm_name": "on", "id_confirm_dob": "on"})
+    check("a clinician outside the care team cannot document history (403)",
+          r.status_code == 403)
+
+    print("== WILSON, J — heart failure workup demonstration ==")
+    wov = nina.get("/patient/K90271?section=OVERVIEW").get_data(as_text=True)
+    check("Wilson is labeled a demonstration record", "Fictional demonstration record" in wov)
+    check("Wilson's disposition is at the planning stage (intent, responsible = Nina)",
+          "Intent recorded" in wov and "Cardiology (telemetry)" in wov)
+    whpi = nina.get("/patient/K90271?section=HPI").get_data(as_text=True)
+    check("Wilson's HPI is documented with source", "orthopnea" in whpi and "Patient-reported" in whpi)
+    wmh = nina.get("/patient/K90271?section=MEDICAL_HISTORY").get_data(as_text=True)
+    check("Wilson's history carries chart-derived items", "Prior myocardial infarction" in wmh and "Chart-derived" in wmh)
+    wvit = nina.get("/patient/K90271?section=VITALS").get_data(as_text=True)
+    check("Wilson's vitals include a documented split (charge nurse measured, Nina recorded)",
+          ("Measured by: " + meta["4"]["name"]) in wvit and ("Recorded by " + meta["3"]["name"]) in wvit)
+    wlab = nina.get("/patient/K90271?section=LABS").get_data(as_text=True)
+    check("Wilson's labs tell the workup story", "BNP 1,240" in wlab and "troponin 14" in wlab)
+    wimg = nina.get("/patient/K90271?section=DIAGNOSTICS").get_data(as_text=True)
+    check("Wilson's existing echo record is preserved untouched",
+          "Echo tech confirmed" in wimg)
+    wcon = nina.get("/patient/K90271?section=CONSULTS").get_data(as_text=True)
+    check("Wilson's cardiology consult is tracked mid-flight",
+          "Cardiology" in wcon and "Service notified:" in wcon and "Not yet recorded" in wcon)
+    thompson = login("nthompson")
+    feed_t = thompson.get("/notifications").get_data(as_text=True)
+    check("clinical records reach teammates' Notifications Center (derived, deep-linked)",
+          "BNP 1,240" in feed_t and "New record" in feed_t)
+
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)
 

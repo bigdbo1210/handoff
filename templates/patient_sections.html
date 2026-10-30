@@ -17,7 +17,7 @@
     <h3 class="pane-title">Overview</h3>
     {% if p.snapshot.get('demonstration') %}
     <div class="rec-entry" style="border:1.5px dashed #b06000; background:#fff8ec;">
-        <div class="rec-text"><strong>Fictional demonstration record — complete care-coordination journey.</strong> This patient's record was authored as a connected demonstration: presentation, history, vitals, labs, imaging, consultation, tasks, disposition, acceptance, sign-off, and responsibility transfer, consistent across every tab.</div>
+        <div class="rec-text"><strong>Fictional demonstration record.</strong> This patient's information was authored as a connected demonstration of the HANDOFF workflow — presentation, history, vitals, labs, imaging, consultation, tasks, and disposition planning, consistent across every tab.</div>
     </div>
     {% endif %}
     {% if p.context %}<p style="font-size:14.5px; line-height:1.6; max-width:700px;"><strong>{{ p.context }}</strong>{% if p.snapshot.overview %} — {{ p.snapshot.overview[0].text }}{% endif %}</p>{% endif %}
@@ -121,6 +121,35 @@
     {% else %}
     <p class="pane-empty">No history of present illness has been recorded for this patient in this demonstration record. When a clinician records it, it appears here with their name and the source of the entry.</p>
     {% endfor %}
+    <div class="composer">
+        <div class="composer-title">Record history of present illness:</div>
+        <form method="POST" action="{{ url_for('history_add') }}">
+            <input type="hidden" name="case_id" value="{{ p.case_id }}">
+            <input type="hidden" name="kind" value="HPI">
+            <textarea name="text" rows="3" maxlength="1000" placeholder="What the patient presents with, in clinical detail..." required style="width:100%"></textarea>
+            <div class="composer-row">
+                <label>Obtained by:
+                    <select name="obtained_by">
+                        <option value="">Not documented</option>
+                        {% for uid, m in user_meta.items() %}<option value="{{ uid }}">{{ m.name }}</option>{% endfor %}
+                    </select></label>
+                <label>Information source:
+                    <select name="origin">
+                        <option value="">Not documented</option>
+                        <option>Patient-reported</option>
+                        <option>Caregiver-reported</option>
+                        <option>Chart-derived</option>
+                        <option>Source-verified</option>
+                    </select></label>
+            </div>
+            <div class="composer-row">
+                <label class="ack-label"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+                <button type="submit">Add to Record</button>
+            </div>
+            <p class="pane-note">Recorded by is always you, the signed-in clinician. Obtained by and the information source are documented only when known — never assumed.</p>
+        </form>
+    </div>
 
 {% elif active_section == "MEDICAL_HISTORY" %}
     <h3 class="pane-title">Medical History</h3>
@@ -132,6 +161,35 @@
     {% else %}
     <p class="pane-empty">No past medical history has been recorded for this patient in this demonstration record.</p>
     {% endfor %}
+    <div class="composer">
+        <div class="composer-title">Record medical history:</div>
+        <form method="POST" action="{{ url_for('history_add') }}">
+            <input type="hidden" name="case_id" value="{{ p.case_id }}">
+            <input type="hidden" name="kind" value="MEDICAL_HISTORY">
+            <textarea name="text" rows="3" maxlength="1000" placeholder="Condition, relevant detail, current therapy..." required style="width:100%"></textarea>
+            <div class="composer-row">
+                <label>Obtained by:
+                    <select name="obtained_by">
+                        <option value="">Not documented</option>
+                        {% for uid, m in user_meta.items() %}<option value="{{ uid }}">{{ m.name }}</option>{% endfor %}
+                    </select></label>
+                <label>Information source:
+                    <select name="origin">
+                        <option value="">Not documented</option>
+                        <option>Patient-reported</option>
+                        <option>Caregiver-reported</option>
+                        <option>Chart-derived</option>
+                        <option>Source-verified</option>
+                    </select></label>
+            </div>
+            <div class="composer-row">
+                <label class="ack-label"><input type="checkbox" name="id_confirm_name" required> Identifier 1 — patient name confirmed</label>
+                <label class="ack-label"><input type="checkbox" name="id_confirm_dob" required> Identifier 2 — DOB / MRN confirmed</label>
+                <button type="submit">Add to Record</button>
+            </div>
+            <p class="pane-note">Recorded by is always you, the signed-in clinician. Obtained by and the information source are documented only when known — never assumed.</p>
+        </form>
+    </div>
 
 {% elif active_section == "VITALS" %}
     <h3 class="pane-title">Vitals</h3>

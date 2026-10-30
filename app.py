@@ -1060,7 +1060,7 @@ def notification_feed(user, handoffs, care, meta):
         it["read"] = it["key"] in state.get("read", [])
         it["acked"] = it["key"] in state.get("ack", [])
     items.sort(key=lambda x: x.get("at", ""), reverse=True)
-    return items[:40]
+    return items[:100]
 
 def notif_unread_count(user, handoffs, care, meta):
     return sum(1 for it in notification_feed(user, handoffs, care, meta) if not it["read"])
@@ -1804,6 +1804,51 @@ def vitals_add():
     save_care(care)
     flash("Vital signs recorded — measurer and recorder are documented separately.")
     return redirect(url_for("patient_page", case_id=case_id, section="VITALS"))
+
+
+HISTORY_ORIGINS = {"", "Patient-reported", "Caregiver-reported", "Chart-derived", "Source-verified"}
+
+
+@app.route("/history/add", methods=["POST"])
+@login_required
+def history_add():
+    """Document an HPI or Medical History entry (Directive 3.0 \u00a77).
+    Obtained-by and information source are recorded as their own facts;
+    the recorder is always the authenticated user."""
+    case_id = str(request.form.get("case_id") or "")
+    handoffs, care, err = _vitals_guard(case_id)
+    if err:
+        return err
+    kind = (request.form.get("kind") or "").upper()
+    if kind not in ("HPI", "MEDICAL_HISTORY"):
+        return "Invalid history section", 400
+    text = (request.form.get("text") or "").strip()
+    if not text:
+        return "The entry cannot be empty", 400
+    if len(text) > 1000:
+        return "Entry too long (1000 characters max)", 400
+    obtained_by = (request.form.get("obtained_by") or "").strip()
+    if obtained_by and not (obtained_by.isdigit() and obtained_by in USERS):
+        return "Invalid obtained-by clinician", 400
+    origin = (request.form.get("origin") or "").strip()
+    if origin not in HISTORY_ORIGINS:
+        return "Invalid information source", 400
+    ts = now_iso()
+    entry = {"text": text, "by": str(current_user.id), "at": ts, "source": "Manually entered"}
+    if obtained_by:
+        entry["performed_by"] = obtained_by
+        entry["performed_at"] = ts
+    if origin:
+        entry["origin"] = origin
+    key = "hpi" if kind == "HPI" else "medical_history"
+    snap = care["snapshots"].setdefault(case_id, {})
+    snap.setdefault(key, []).append(entry)
+    label = "History of present illness" if kind == "HPI" else "Medical history"
+    _file_record(handoffs, case_id, f"{label} recorded \u2014 {text}")
+    save_handoffs(handoffs)
+    save_care(care)
+    flash(f"{label} recorded with its source and attribution.")
+    return redirect(url_for("patient_page", case_id=case_id, section=kind))
 
 
 @app.route("/vitals/amend", methods=["POST"])

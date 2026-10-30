@@ -102,8 +102,10 @@ def main():
     check("the status columns step aside while filtered",
           'class="column escalated"' not in page)
 
-    # Totals include the 2026-10-23 journey patient (H72410).
-    totals = {"NEW": (5, 5), "IN_PROGRESS": (10, 10), "ESCALATED": (3, 3),
+    # Totals include the 2026-10-23 journey patient (H72410) and Wilson's
+    # heart-failure workup task (K90271; Wilson was already an in-progress
+    # patient via the echo task, so tasks +1, patients unchanged).
+    totals = {"NEW": (5, 5), "IN_PROGRESS": (11, 10), "ESCALATED": (3, 3),
               "COMPLETED": (6, 5), "CANCELED": (0, 0)}
     for f, want in totals.items():
         got = header_counts(thompson.get(f"/board?filter={f}").get_data(as_text=True))

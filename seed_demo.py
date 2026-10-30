@@ -69,6 +69,12 @@ def build_seed_care():
                                "service": "Inpatient Rehabilitation", "at": t(125)},
                 "completed": None, "responsible": "3",
             },
+            "K90271": {
+                "intent": "ADMIT", "service": "Cardiology (telemetry)",
+                "intent_recorded": {"by": "3", "at": t(100)},
+                "order_placed": None,
+                "acceptance": None, "completed": None, "responsible": "3",
+            },
             "H72410": {
                 "intent": "ADMIT", "service": "Internal Medicine (Hospitalist)",
                 "intent_recorded": {"by": "3", "at": t(320)},
@@ -130,6 +136,18 @@ def build_seed_care():
                 "vitals": [
                     {"bp": "102/64", "hr": "118", "rr": "24", "spo2": "97% RA", "temp": "99.8\u00b0F", "by": "8", "at": t(80), "source": "Manually entered"}],
             },
+            "K90271": {
+                "demonstration": True,
+                "overview": [{"text": "74-year-old under a heart failure workup: three days of progressive shortness of breath, orthopnea, and leg swelling. Echocardiogram coordinated and in progress; cardiology consulted; intent to admit recorded for telemetry while the workup completes.", "by": "3", "at": t(300), "source": "Manually entered"}],
+                "hpi": [{"text": "Three days of progressive dyspnea, now breathless walking across a room. Sleeping on three pillows for two nights (orthopnea); no chest pain. Ankles noticeably swollen by evening. Gained about 6 lb in a week by home scale. History obtained directly from the patient.", "by": "3", "at": t(305), "source": "Manually entered", "performed_by": "3", "performed_at": t(308), "origin": "Patient-reported"}],
+                "medical_history": [
+                    {"text": "Hypertension \u2014 on lisinopril.", "by": "3", "at": t(298), "source": "Source-verified entry", "performed_by": "3", "performed_at": t(299), "origin": "Chart-derived"},
+                    {"text": "Prior myocardial infarction (2019) \u2014 stent placed; on aspirin and atorvastatin per the chart.", "by": "3", "at": t(298), "source": "Source-verified entry", "performed_by": "3", "performed_at": t(299), "origin": "Chart-derived"},
+                    {"text": "Type 2 diabetes mellitus \u2014 metformin (patient-reported).", "by": "8", "at": t(296), "source": "Manually entered", "performed_by": "8", "performed_at": t(297), "origin": "Patient-reported"}],
+                "vitals": [
+                    {"bp": "148/86", "hr": "104", "rr": "24", "spo2": "91% RA", "temp": "98.2\u00b0F", "by": "3", "at": t(150), "performed_by": "4", "performed_at": t(153), "source": "Manually entered"},
+                    {"bp": "142/82", "hr": "98", "rr": "22", "spo2": "93% RA", "temp": "98.4\u00b0F", "by": "8", "at": t(45), "performed_by": "8", "performed_at": t(47), "source": "Manually entered"}],
+            },
             "H72410": {
                 "demonstration": True,
                 "overview": [{"text": "69-year-old presenting with melena and lightheadedness. Acute upper GI bleed \u2014 GI consulted, EGD completed, transfused 2 units, admitted to Internal Medicine. Responsibility transferred at sign-off; the repeat Hgb is owned by the accepting team.", "by": "3", "at": t(500), "source": "Manually entered"}],
@@ -151,6 +169,9 @@ def build_seed_care():
             {"id": "seed-acc-b77102", "case_id": "B77102", "kind": "ACCEPTANCE", "by": "7",
              "text": "Receiving acceptance recorded \u2014 Maple Grove Rehab accepted (Inpatient Rehabilitation). Sign-off still pending; responsibility has not transferred.",
              "at": t(125), "ack_required": False},
+            {"id": "seed-intent-k90271", "case_id": "K90271", "kind": "DISPOSITION_INTENT", "by": "3",
+             "text": "Intent to admit recorded \u2014 Cardiology (telemetry). Bed request not yet entered; workup in progress.",
+             "at": t(100), "ack_required": False},
             {"id": "seed-intent-h72410", "case_id": "H72410", "kind": "DISPOSITION_INTENT", "by": "3",
              "text": "Intent to admit recorded \u2014 Internal Medicine (Hospitalist).",
              "at": t(320), "ack_required": False},
@@ -178,6 +199,15 @@ def build_seed_care():
                     "RECOMMENDATIONS": {"by": "2", "at": t(428), "source": "Manually entered", "actor_id": "2", "note": "EGD within 12 hours, continue IV PPI, type & crossmatch 2 units, repeat hemoglobin in 6 hours"},
                     "REVIEWED": {"by": "3", "at": t(415), "source": "Manually entered", "note": "Reviewed with the responsible clinician; EGD and transfusion tasks opened"},
                     "SIGNED_OFF": {"by": "2", "at": t(330), "source": "Manually entered", "actor_id": "2"},
+                },
+            }],
+            "K90271": [{
+                "id": "seed-consult-k90271",
+                "service": "Cardiology",
+                "reason": "Heart failure workup \u2014 echo pending, disposition planning",
+                "stages": {
+                    "REQUESTED": {"by": "3", "at": t(200), "source": "Manually entered", "note": "Heart failure workup \u2014 echo pending, disposition planning"},
+                    "NOTIFIED": {"by": "7", "at": t(195), "source": "Manually entered", "note": "Cardiology service paged"},
                 },
             }],
             "A44219": [{
@@ -781,6 +811,37 @@ def build_seed_handoffs():
             {"at": t(125), "event": "RECORD_ADDED", "type": "NOTE", "text": "Opened at disposition sign-off: the repeat hemoglobin is owned by the accepting inpatient team. Task ownership and overall care responsibility are recorded separately.", "by": 3},
             {"at": t(118), "event": "OWNERSHIP_TRANSFERRED", "by": "3 → 2"},
             {"at": t(115), "event": "STATUS_CHANGED_TO_IN_PROGRESS", "by": 2},
+        ],
+    },
+    # 20) WILSON, J — heart failure workup coordination (2026-10-23). The
+    # labs and therapy updates live here; the echo task and its existing
+    # record are untouched, and the snapshot carries presentation/history/
+    # vitals. Disposition is at the planning stage (intent recorded).
+    {
+        "handoff_id": hid(320, "w5e5"),
+        "patient_name": "WILSON, J",
+        "age": 74,
+        "sex": "M",
+        "case_id": "K90271",
+        "event": "Heart Failure Workup \u2014 Coordination",
+        "section": "TASKS",
+        "patient_context": "Heart Failure Workup",
+        "initiator": 1,
+        "owner": 3,
+        "status": "IN_PROGRESS",
+        "created_at": t(320),
+        "updated_at": t(45),
+        "acknowledged_at": t(310),
+        "acknowledged_by": 3,
+        "history": [
+            {"at": t(320), "event": "CREATED", "by": 1},
+            {"at": t(315), "event": "STATUS_CHANGED_TO_IN_PROGRESS", "by": 1},
+            {"at": t(310), "event": "OWNERSHIP_TRANSFERRED", "by": "1 \u2192 3"},
+            {"at": t(300), "event": "RECORD_ADDED", "type": "ORDER", "category": "LAB", "text": "BNP and basic metabolic panel ordered by Dr. Carter; entered by Nina Johnson, NP.", "by": 3},
+            {"at": t(235), "event": "RECORD_ADDED", "type": "UPDATE", "category": "LAB", "text": "BNP 1,240 pg/mL \u2014 Final. Central Laboratory result, recorded from the laboratory report.", "by": 7},
+            {"at": t(230), "event": "RECORD_ADDED", "type": "UPDATE", "category": "LAB", "text": "Basic metabolic panel \u2014 Final: sodium 138, potassium 4.6, creatinine 1.3 (chart baseline 1.1). Central Laboratory result, recorded from the laboratory report.", "by": 7},
+            {"at": t(120), "event": "RECORD_ADDED", "type": "NOTE", "text": "First IV furosemide dose given per the treating clinician's order; urine output being monitored and recorded by the bedside team.", "by": 4, "performed_by": "4", "performed_at": t(122)},
+            {"at": t(90), "event": "RECORD_ADDED", "type": "UPDATE", "category": "LAB", "text": "High-sensitivity troponin 14 ng/L \u2014 Final; the laboratory report flags no elevation. Second sample pending. Recorded from the laboratory report.", "by": 7},
         ],
     },
     ]
