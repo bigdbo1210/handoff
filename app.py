@@ -693,6 +693,7 @@ def index():
     active_filter = (request.args.get("filter") or "").upper() or None
     ctx = build_worklist(handoffs, care, current_user, meta, q=q, active_filter=active_filter)
     version = state_version(handoffs, [p["case_id"] for p in ctx["authorized_all"]], meta)
+    feed = notification_feed(current_user, handoffs, care, meta)
     return render_template(
         "index.html",
         **ctx,
@@ -703,7 +704,8 @@ def index():
         can_restore=(str(current_user.role_id) in ORG_WIDE_ROLES
                      or current_user.username == "njohnson"),
         total_count=len(all_patients(handoffs)),
-        notif_unread=notif_unread_count(current_user, handoffs, care, meta),
+        notif_unread=sum(1 for it in feed if not it["read"]),
+        notif_items=feed[:8],
         state_version=version,
         section_labels=SECTION_LABELS,
         filter_labels=FILTER_LABELS,
@@ -775,10 +777,12 @@ def board():
                              active_filter=board_filter, unit_scope=unit_wide)
     else:
         board_filter = None
+    feed = notification_feed(current_user, raw, care, meta)
     kwargs = dict(handoffs=handoffs, roles=display_roles(), users=USERS,
                   metrics=metrics, user_meta=meta, q=q, total_count=len(all_handoffs),
                   user=str(current_user.id), can_drill=can_drill, unit_wide=unit_wide,
-                  notif_unread=notif_unread_count(current_user, raw, care, meta),
+                  notif_unread=sum(1 for it in feed if not it["read"]),
+                  notif_items=feed[:8],
                   board_filter=board_filter, section_labels=SECTION_LABELS,
                   filter_labels=FILTER_LABELS)
     kwargs.update(ctx)  # unit-scope ctx metrics are the board's own numbers
@@ -865,6 +869,7 @@ def patient_page(case_id):
     if section not in WORKSPACE_SECTIONS:
         section = "OVERVIEW"
     version = state_version(handoffs, [str(case_id)], meta)
+    feed = notification_feed(current_user, handoffs, care, meta)
     return render_template(
         "patient.html",
         p=view,
@@ -875,7 +880,8 @@ def patient_page(case_id):
         section_labels=SECTION_LABELS,
         sections=WORKSPACE_SECTIONS,
         hl=request.args.get("hl") or "",
-        notif_unread=notif_unread_count(current_user, handoffs, care, meta),
+        notif_unread=sum(1 for it in feed if not it["read"]),
+        notif_items=feed[:8],
         state_version=version,
     )
 
@@ -1003,6 +1009,30 @@ STORED_NOTIF_LABELS = {
     "SIMULATION": "Simulated incoming alert",
 }
 
+# Consultation records filed on a chart surface as consult notifications —
+# labeled by stage and deep-linked to the Consultations tab — instead of
+# anonymous "New record" items (real-time alerts round, 2026-10-31).
+# Live consult actions file deterministic texts ("Consultation
+# requested — …", "Consultation <stage> — …"); seeded records carry
+# category CONSULT instead, and keep a generic consult label because
+# their stage is not machine-recorded.
+_CONSULT_STAGE_LABELS = {lbl.lower(): lbl for k, lbl in CONSULT_STAGES if k != "REQUESTED"}
+
+def _consult_notif(e):
+    """(kind, label, ack_required) if a history record belongs to a
+    consultation, else None."""
+    text = e.get("text") or ""
+    if text.startswith("Consultation requested — "):
+        return ("CONSULT_REQUESTED", "Consult requested", True)
+    if text.startswith("Consultation "):
+        rest = text[len("Consultation "):].lower()
+        for low, lbl in _CONSULT_STAGE_LABELS.items():
+            if rest.startswith(low + " — "):
+                return ("CONSULT_STAGE", f"Consult — {lbl}", False)
+    if e.get("category") == "CONSULT":
+        return ("CONSULT_RECORD", "Consult update", False)
+    return None
+
 def notification_feed(user, handoffs, care, meta):
     items = []
     patients = all_patients(handoffs)
@@ -1030,18 +1060,26 @@ def notification_feed(user, handoffs, care, meta):
                 ev = e.get("event")
                 kind = label = None
                 ack = False
-                if ev in DERIVED_NOTIF_KINDS:
+                consult = _consult_notif(e) if ev == "RECORD_ADDED" else None
+                if consult:
+                    kind, label, ack = consult
+                elif ev in DERIVED_NOTIF_KINDS:
                     kind, label, ack = ev, DERIVED_NOTIF_KINDS[ev][0], DERIVED_NOTIF_KINDS[ev][1]
                 elif ev == "OWNERSHIP_TRANSFERRED" and actor is not None:
                     if str(actor) == str(user.id):
                         kind, label, ack = ev, "Baton received", True
                     else:
                         kind, label = ev, "Baton moved"
-                elif ev == "CREATED" and str(h.get("owner")) == str(user.id):
-                    kind, label, ack = ev, "New assignment", True
+                elif ev == "CREATED":
+                    if str(h.get("owner")) == str(user.id):
+                        kind, label, ack = ev, "New assignment", True
+                    else:
+                        kind, label, ack = ev, "New handoff", False
                 if not kind:
                     continue
-                if ev == "RECORD_ADDED":
+                if consult:
+                    deep_section = "CONSULTS"
+                elif ev == "RECORD_ADDED":
                     deep_section = event_section(e, h)
                 elif ev == "HANDOFF_CANCELED":
                     deep_section = "HISTORY"
@@ -1064,6 +1102,11 @@ def notification_feed(user, handoffs, care, meta):
 
 def notif_unread_count(user, handoffs, care, meta):
     return sum(1 for it in notification_feed(user, handoffs, care, meta) if not it["read"])
+
+def notif_panel_items(user, handoffs, care, meta, limit=8):
+    """The notification bell's first-paint items: the newest feed entries,
+    in the feed's own order (newest first)."""
+    return notification_feed(user, handoffs, care, meta)[:limit]
 
 # -----------------------------
 # Follow / care-team management
@@ -1379,6 +1422,54 @@ def notifications_ack():
     state["ack"] = sorted(ack_set)
     save_care(care)
     return redirect(url_for("notifications_page"))
+
+@app.route("/api/notifications")
+@login_required
+def api_notifications():
+    """JSON feed for the notification bell (real-time alerts round,
+    2026-10-31): unread counts plus the latest items, each with its
+    exact-record link. The bell polls this on the app's existing
+    20-second cadence — the same rhythm /api/state already uses — so an
+    open page surfaces a change without a reload or a search. There is
+    no push channel in this stack; polling is the honest mechanism."""
+    handoffs = load_handoffs()
+    care = load_care()
+    meta = user_meta()
+    feed = notification_feed(current_user, handoffs, care, meta)
+    items = [{
+        "key": it["key"], "kind": it["kind"], "label": it["label"],
+        "patient_name": it["patient_name"], "case_id": it["case_id"],
+        "text": it["text"], "at": it["at"], "read": it["read"],
+        "acked": it["acked"], "ack_required": it["ack_required"],
+        "url": url_for("patient_page", case_id=it["case_id"],
+                       section=it["section"], hl=it["hl"]),
+    } for it in feed[:8]]
+    return {
+        "unread": sum(1 for it in feed if not it["read"]),
+        "ack_unread": sum(1 for it in feed if it["ack_required"] and not it["acked"]),
+        "items": items,
+    }
+
+@app.route("/notifications/mark-read", methods=["POST"])
+@login_required
+def notifications_mark_read():
+    """Mark the signed-in clinician's current feed read from the bell.
+    Reading is not acknowledgment — the exact rule the Notifications
+    Center applies when it is opened; ack-required items keep their
+    Acknowledge button in the Center until they are acknowledged."""
+    handoffs = load_handoffs()
+    care = load_care()
+    meta = user_meta()
+    items = notification_feed(current_user, handoffs, care, meta)
+    state = care["notif_state"].setdefault(str(current_user.id), {"read": [], "ack": []})
+    read_set = set(state.get("read", []))
+    for it in items:
+        read_set.add(it["key"])
+    state["read"] = sorted(read_set)
+    save_care(care)
+    if request.form.get("next"):
+        return redirect(request.form["next"])
+    return {"ok": True, "unread": 0}
 
 # -----------------------------
 # Create a handoff

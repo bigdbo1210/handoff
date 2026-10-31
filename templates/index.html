@@ -195,7 +195,7 @@
         <div class="userchip">
             <div class="avatar" style="background: {{ cm.color if cm else '#5f6368' }}">{{ cm.initials if cm else '?' }}</div>
             <div class="who"><div class="n">{{ current_user.name }}</div><div class="r">{{ current_user.role_name }}</div></div>
-            <a href="{{ url_for('notifications_page') }}">Notifications{% if notif_unread %} ({{ notif_unread }}){% endif %}</a>
+            {% include "_notif_bell.html" %}
             <a href="{{ url_for('board') }}">Operations Board</a>
             <a href="{{ url_for('logout') }}">Sign out</a>
         </div>

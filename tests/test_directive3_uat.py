@@ -63,7 +63,14 @@ def main():
     check("roster rows show DOB and MRN", "DOB 07/02/1955" in html and "MRN 7712045" in html)
     html = nina.get("/?q=7712045").get_data(as_text=True)
     check("search by MRN finds JOHNSON", "A44219" in html)
-    check("search by MRN excludes LEE", "E90214" not in html)
+    # Scoped to the roster region (updated Oct 31 round): the page chrome
+    # now carries the signed-in clinician's own notification bell, whose
+    # panel legitimately names patients SHE is authorized for — Nina is
+    # on Lee's team. The bell is personal chrome, not search output; the
+    # privacy property this check guards is that the ROSTER search does
+    # not leak a non-matching patient, so the assertion reads the roster.
+    roster = html.split('id="worklist-wrap"', 1)[-1]
+    check("search by MRN excludes LEE", "E90214" not in roster)
     html = nina.get("/?q=07/02/1955").get_data(as_text=True)
     check("search by DOB finds JOHNSON", "A44219" in html)
     html = nina.get("/?q=5520117").get_data(as_text=True)

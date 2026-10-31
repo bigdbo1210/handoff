@@ -187,7 +187,7 @@
         <div class="userchip">
             <div class="avatar" style="background: {{ cm.color if cm else '#5f6368' }}">{{ cm.initials if cm else '?' }}</div>
             <div class="who"><div class="n">{{ current_user.name }}</div><div class="r">{{ current_user.role_name }}</div></div>
-            <a href="{{ url_for('notifications_page') }}" style="color:#7db4ff; font-size:12.5px; text-decoration:none; margin-right:8px;">Notifications{% if notif_unread %} ({{ notif_unread }}){% endif %}</a><a href="{{ url_for('index') }}" style="color:#7db4ff; font-size:12.5px; text-decoration:none; margin-right:8px;">My Patients →</a><a href="{{ url_for('logout') }}">Sign out</a>
+            {% include "_notif_bell.html" %}<a href="{{ url_for('index') }}" style="color:#7db4ff; font-size:12.5px; text-decoration:none; margin-right:8px;">My Patients →</a><a href="{{ url_for('logout') }}">Sign out</a>
         </div>
     </div>
 

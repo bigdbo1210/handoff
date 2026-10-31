@@ -1,0 +1,143 @@
+{# Notification bell — real-time alerts (Oct 31 round, answering the
+   reviewer finding: "we don't get notifications — we have to search, and
+   we don't know things have changed until they've changed").
+   Server-rendered for first paint (badge + latest items); the script
+   polls /api/notifications on the app's existing 20-second cadence —
+   the same rhythm /api/state already uses — updates the badge and panel
+   in place, and raises a toast when the unread count grows, so an open
+   page surfaces a change without a reload or a search. Marking read
+   never acknowledges: acknowledgment stays a separate, deliberate act
+   in the Notifications Center (Directive 3.0 rule). #}
+<span class="hn-wrap">
+  <a class="hn-bell" id="hn-bell" href="{{ url_for('notifications_page') }}" aria-label="Notifications Center">🔔<span class="hn-badge" id="hn-badge"{% if not notif_unread %} hidden{% endif %}>{{ notif_unread }}</span></a><button type="button" class="hn-toggle" id="hn-toggle" aria-haspopup="true" aria-expanded="false" title="Recent notifications">▾</button>
+  <div class="hn-panel" id="hn-panel" hidden>
+    <div class="hn-head">
+      <strong>Notifications</strong>
+      <button type="button" class="hn-markread" id="hn-markread">Mark all read</button>
+      <a class="hn-center" href="{{ url_for('notifications_page') }}">Open the Center →</a>
+    </div>
+    <div class="hn-items" id="hn-items">
+      {% for n in notif_items %}
+      <a class="hn-item{% if not n.read %} unread{% endif %}" href="{{ url_for('patient_page', case_id=n.case_id, section=n.section, hl=n.hl) }}">
+        <span class="hn-label">{{ n.label }}{% if n.ack_required and not n.acked %} · Ack needed{% endif %}</span>
+        <span class="hn-patient">{{ n.patient_name }} · Case {{ n.case_id }}</span>
+        <span class="hn-text">{{ n.text }}</span>
+        <span class="hn-time">{{ n.at | fmt_ts }}</span>
+      </a>
+      {% else %}
+      <div class="hn-empty">No notifications yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</span>
+<div class="hn-toast" id="hn-toast" hidden></div>
+<style>
+.hn-wrap { position: relative; display: inline-block; }
+.hn-bell { position: relative; text-decoration: none; font-size: 15px; }
+.hn-badge { position: absolute; top: -7px; right: -11px; background: #d93025; color: #fff; font-size: 10.5px; font-weight: bold; min-width: 17px; height: 17px; line-height: 17px; text-align: center; border-radius: 9px; padding: 0 4px; box-sizing: border-box; }
+.hn-badge[hidden] { display: none; }
+.hn-toggle { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 11px; padding: 2px 3px; margin-left: 13px; }
+.hn-panel { position: absolute; right: 0; top: calc(100% + 10px); width: 350px; max-width: 92vw; max-height: 70vh; overflow-y: auto; background: #fff; color: #16283f; border: 1px solid #d7e0ec; border-radius: 10px; box-shadow: 0 10px 30px rgba(11,24,40,.28); z-index: 80; text-align: left; white-space: normal; }
+.hn-panel[hidden] { display: none; }
+.hn-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #e2e9f2; font-size: 13px; color: #10233c; }
+.hn-panel .hn-markread { background: #eef4ff; color: #174ea6; border: 1px solid #bcd6ff; border-radius: 6px; font-size: 11.5px; font-weight: bold; padding: 4px 8px; cursor: pointer; margin-left: auto; margin-top: 0; }
+.hn-panel .hn-center { color: #174ea6; font-size: 12px; font-weight: bold; text-decoration: none; white-space: nowrap; }
+.hn-panel .hn-item { display: block; padding: 9px 12px; border-bottom: 1px solid #eef2f7; text-decoration: none; color: #22344c; }
+.hn-panel .hn-item:hover { background: #f4f8ff; }
+.hn-panel .hn-item.unread { border-left: 4px solid #1a73e8; background: #fbfdff; }
+.hn-label { display: block; font-size: 10.5px; font-weight: bold; letter-spacing: .6px; text-transform: uppercase; color: #174ea6; }
+.hn-patient { display: block; font-size: 12.5px; font-weight: bold; color: #10233c; margin-top: 2px; }
+.hn-text { display: block; font-size: 12.5px; margin-top: 2px; }
+.hn-time { display: block; font-size: 11px; color: #63758c; margin-top: 3px; }
+.hn-empty { padding: 14px 12px; font-size: 12.5px; color: #63758c; }
+.hn-toast { position: fixed; right: 18px; bottom: 18px; max-width: 360px; background: #10233c; color: #eaf1fb; border-left: 5px solid #7db4ff; border-radius: 8px; padding: 11px 14px; font-size: 13px; box-shadow: 0 8px 24px rgba(11,24,40,.35); cursor: pointer; z-index: 90; }
+.hn-toast[hidden] { display: none; }
+.hn-toast-open { color: #7db4ff; font-weight: bold; }
+</style>
+<script>
+(function () {
+    var badge = document.getElementById('hn-badge');
+    var panel = document.getElementById('hn-panel');
+    var itemsBox = document.getElementById('hn-items');
+    var toggle = document.getElementById('hn-toggle');
+    var toast = document.getElementById('hn-toast');
+    if (!badge || !panel || !itemsBox || !toggle || !toast) return;
+    var lastUnread = {{ notif_unread|default(0) }};
+    var toastTimer = null;
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function fmtTime(iso) {
+        var dt = new Date(iso);
+        if (isNaN(dt)) return '';
+        return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(dt);
+    }
+    function renderItems(items) {
+        if (!items.length) { itemsBox.innerHTML = '<div class="hn-empty">No notifications yet.</div>'; return; }
+        itemsBox.innerHTML = items.map(function (n) {
+            return '<a class="hn-item' + (n.read ? '' : ' unread') + '" href="' + esc(n.url) + '">' +
+                '<span class="hn-label">' + esc(n.label) + (n.ack_required && !n.acked ? ' · Ack needed' : '') + '</span>' +
+                '<span class="hn-patient">' + esc(n.patient_name) + ' · Case ' + esc(n.case_id) + '</span>' +
+                '<span class="hn-text">' + esc(n.text) + '</span>' +
+                '<span class="hn-time">' + esc(fmtTime(n.at)) + '</span></a>';
+        }).join('');
+    }
+    function setBadge(n) { badge.textContent = n; badge.hidden = !n; }
+    function showToast(n) {
+        toast.innerHTML = '<strong>' + esc(n.label) + '</strong> — ' + esc(n.patient_name) + ': ' + esc(n.text) + ' <span class="hn-toast-open">Open →</span>';
+        toast.hidden = false;
+        toast.onclick = function () { window.location = n.url; };
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.hidden = true; }, 9000);
+    }
+    function beep() {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = 880; g.gain.value = 0.06;
+            o.start(); o.stop(ctx.currentTime + 0.18);
+        } catch (e) { /* audio unavailable on this device */ }
+    }
+    async function poll() {
+        try {
+            var r = await fetch("{{ url_for('api_notifications') }}");
+            if (!r.ok) return;
+            var s = await r.json();
+            setBadge(s.unread);
+            renderItems(s.items);
+            if (s.unread > lastUnread) {
+                var fresh = null;
+                for (var i = 0; i < s.items.length; i++) { if (!s.items[i].read) { fresh = s.items[i]; break; } }
+                if (fresh) {
+                    showToast(fresh);
+                    if (fresh.ack_required && localStorage.getItem('handoff_audible') === '1') beep();
+                }
+            }
+            lastUnread = s.unread;
+        } catch (e) { /* silent: alerts must never break the page */ }
+    }
+    toggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = panel.hidden;
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('click', function (e) {
+        if (!panel.hidden && !(e.target.closest && e.target.closest('.hn-wrap'))) {
+            panel.hidden = true;
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') panel.hidden = true; });
+    document.getElementById('hn-markread').addEventListener('click', async function () {
+        try {
+            var r = await fetch("{{ url_for('notifications_mark_read') }}", { method: 'POST' });
+            if (!r.ok) return;
+            lastUnread = 0;
+            setBadge(0);
+            itemsBox.querySelectorAll('.hn-item.unread').forEach(function (el) { el.classList.remove('unread'); });
+        } catch (e) { /* the Center remains available */ }
+    });
+    setInterval(poll, 20000);
+})();
+</script>
