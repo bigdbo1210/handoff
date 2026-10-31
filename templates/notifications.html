@@ -2,6 +2,12 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#10233c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
     <title>Handoff — Notifications Center</title>
     <style>
         * { box-sizing: border-box; }
@@ -30,6 +36,10 @@
         .sim-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#fff; border:1px solid #e2e9f2; border-radius:10px; padding:12px 15px; margin-bottom:14px; box-shadow:0 1px 4px rgba(16,42,74,.07); font-size:13.5px; }
         .sim-btn { background:#102a4a; margin-top:0; }
         .sim-btn:hover { background:#17406e; }
+        #push-alerts-box .push-btn { background:#102a4a; margin-top:0; }
+        #push-alerts-box .push-btn:hover { background:#17406e; }
+        #push-alerts-box .push-btn.push-on { background:#137333; }
+        #push-alerts-box .push-note { font-size:13px; color:#5c6f87; }
         .rec-link { color:#174ea6; font-weight:bold; text-decoration:none; }
         .rec-link:hover { text-decoration:underline; }
         .empty { background: white; border: 1px solid #e2e9f2; border-radius: 10px; padding: 22px; text-align: center; color: #63758c; font-size: 14px; }
@@ -52,6 +62,10 @@
             </form>
             <span style="color:#5c6f87">Adds one clearly-labeled simulated alert for your most recently updated patient, so you can see exactly how a new alert arrives.</span>
             <label style="margin-left:auto"><input type="checkbox" id="audible-toggle"> Audible alert for items needing acknowledgment (this device)</label>
+        </div>
+        <div class="sim-row">
+            <div id="push-alerts-box"><span class="push-note">📱 Phone alerts: checking this device…</span></div>
+            <span style="color:#5c6f87">Phone alerts arrive like a clinical text — patient + what changed, tap to open the exact record — even with the app closed. Free: delivered by your browser's push service, no texting plan and no per-message cost. Urgent items (escalations, anything needing acknowledgment) vibrate in a distinct pattern and stay on screen.</span>
         </div>
         {% if items %}
             {% for n in items %}
@@ -109,5 +123,6 @@ document.querySelectorAll('.time').forEach(el => {
     }
 })();
 </script>
+<script src="{{ url_for('static', filename='push.js') }}" defer></script>
 </body>
 </html>

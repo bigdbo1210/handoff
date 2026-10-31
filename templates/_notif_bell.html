@@ -28,6 +28,7 @@
       <div class="hn-empty">No notifications yet.</div>
       {% endfor %}
     </div>
+    <div class="hn-push" id="push-alerts-box"><span class="push-note">📱 Phone alerts: checking this device…</span></div>
   </div>
 </span>
 <div class="hn-toast" id="hn-toast" hidden></div>
@@ -50,6 +51,12 @@
 .hn-text { display: block; font-size: 12.5px; margin-top: 2px; }
 .hn-time { display: block; font-size: 11px; color: #63758c; margin-top: 3px; }
 .hn-empty { padding: 14px 12px; font-size: 12.5px; color: #63758c; }
+.hn-push { border-top: 1px solid #e2e9f2; padding: 10px 12px; background: #f7fafd; }
+.hn-push .push-btn { background: #10233c; color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; padding: 7px 10px; cursor: pointer; display: block; width: 100%; text-align: left; }
+.hn-push .push-btn:hover { background: #17406e; }
+.hn-push .push-btn.push-on { background: #137333; }
+.hn-push .push-note { display: block; font-size: 11.5px; color: #63758c; margin-top: 5px; line-height: 1.45; }
+.hn-push > .push-note:first-child { margin-top: 0; }
 .hn-toast { position: fixed; right: 18px; bottom: 18px; max-width: 360px; background: #10233c; color: #eaf1fb; border-left: 5px solid #7db4ff; border-radius: 8px; padding: 11px 14px; font-size: 13px; box-shadow: 0 8px 24px rgba(11,24,40,.35); cursor: pointer; z-index: 90; }
 .hn-toast[hidden] { display: none; }
 .hn-toast-open { color: #7db4ff; font-weight: bold; }
@@ -141,3 +148,4 @@
     setInterval(poll, 20000);
 })();
 </script>
+<script src="{{ url_for('static', filename='push.js') }}" defer></script>

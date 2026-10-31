@@ -19,6 +19,7 @@ Demo logins are listed in DEMO.md. DEMO ONLY — not for real PHI.
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+import base64
 import hashlib
 import json
 import os
@@ -191,6 +192,8 @@ def load_care():
     data.setdefault("snapshots", {})
     data.setdefault("notifications", [])
     data.setdefault("notif_state", {})
+    data.setdefault("push_subscriptions", {})
+    data.setdefault("push_state", {})
     return data
 
 def save_care(care):
@@ -1430,8 +1433,9 @@ def api_notifications():
     2026-10-31): unread counts plus the latest items, each with its
     exact-record link. The bell polls this on the app's existing
     20-second cadence — the same rhythm /api/state already uses — so an
-    open page surfaces a change without a reload or a search. There is
-    no push channel in this stack; polling is the honest mechanism."""
+    open page surfaces a change without a reload or a search. The same
+    feed also drives Web Push delivery to phones (see the phone-alerts
+    section below): polling serves open pages, push serves pockets."""
     handoffs = load_handoffs()
     care = load_care()
     meta = user_meta()
@@ -1470,6 +1474,275 @@ def notifications_mark_read():
     if request.form.get("next"):
         return redirect(request.form["next"])
     return {"ok": True, "unread": 0}
+
+# -----------------------------
+# Phone alerts — Web Push (Oct 31 round, Derrick's directive)
+# -----------------------------
+# The bell made changes visible on an open page; Nina's remaining gap
+# was reach: clinicians are away from screens, in other patients'
+# rooms. This section delivers the SAME notification feed to the phone
+# as Web Push — it arrives like a clinical text message (patient +
+# what changed; tap opens the exact record), with the app closed.
+#
+# Zero operating cost, by construction: delivery rides the browser
+# vendors' push services (FCM / Mozilla / Apple), which are free to
+# send through; VAPID authentication is a self-signed keypair, no
+# account or certificate to buy; there is no SMS, no third-party
+# relay, and no per-message charge anywhere in the path.
+#
+# Urgency uses the feed's existing semantics — no new taxonomy: an
+# item is urgent exactly when it requires acknowledgment (escalations
+# are ack-required; so are consult requests and new assignments). The
+# service worker gives urgent items the attention handling a web app
+# controls: a distinct vibration pattern, renotify, and
+# requireInteraction. The audible tone itself remains the phone's own
+# notification sound — a web app cannot choose it or force volume.
+#
+# Reading ≠ acknowledgment still holds: push is a delivery channel for
+# the same notifications, never a state change.
+
+_VAPID = {}
+
+def _b64url(raw):
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+def _vapid_keys():
+    """(public_key_b64url, private_key_pem, subject) for Web Push.
+
+    Durable path: HANDOFF_VAPID_PUBLIC_KEY / HANDOFF_VAPID_PRIVATE_KEY
+    (PEM, or a base64url raw scalar) / HANDOFF_VAPID_SUBJECT in the
+    environment (set on the Render service). Without them, a keypair
+    is generated at first use and kept in server memory only — pushes
+    work, but phones must re-enable alerts after a server restart
+    because the applicationServerKey changes. The private key is never
+    written to the repo or the data store."""
+    if _VAPID:
+        return _VAPID["public"], _VAPID["private_pem"], _VAPID["subject"]
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    subject = os.environ.get("HANDOFF_VAPID_SUBJECT", "mailto:handoff@example.com")
+    pub_env = os.environ.get("HANDOFF_VAPID_PUBLIC_KEY")
+    priv_env = os.environ.get("HANDOFF_VAPID_PRIVATE_KEY")
+    key = None
+    if priv_env:
+        try:
+            if "BEGIN" in priv_env:
+                key = serialization.load_pem_private_key(
+                    priv_env.replace("\\n", "\n").encode(), password=None)
+            else:
+                raw = base64.urlsafe_b64decode(priv_env + "=" * (-len(priv_env) % 4))
+                key = ec.derive_private_key(int.from_bytes(raw, "big"), ec.SECP256R1())
+        except Exception:
+            key = None
+    if key is None:
+        key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(serialization.Encoding.PEM,
+                            serialization.PrivateFormat.PKCS8,
+                            serialization.NoEncryption()).decode()
+    pub = pub_env or _b64url(key.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint))
+    _VAPID.update(public=pub, private_pem=pem, subject=subject)
+    return pub, pem, subject
+
+class PushGoneError(Exception):
+    """The push service says this subscription is dead (404/410) —
+    the device unsubscribed or the browser dropped it. Remove it."""
+
+def send_web_push(subscription, payload):
+    """Deliver one push message. Monkeypatched by the tests; in
+    production this is pywebpush against the browser vendor's free
+    push service. Returns True on acceptance; raises PushGoneError
+    for a dead subscription; any other failure returns False and is
+    swallowed by the dispatcher — an alert channel must never break
+    the clinical action that triggered it."""
+    _pub, priv_pem, subject = _vapid_keys()
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        return False
+    try:
+        webpush(subscription_info=subscription,
+                data=json.dumps(payload),
+                vapid_private_key=priv_pem,
+                vapid_claims={"sub": subject},
+                ttl=3600)
+        return True
+    except WebPushException as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status in (404, 410):
+            raise PushGoneError(f"push subscription gone ({status})")
+        return False
+
+def _push_payload(item):
+    """Clinical-text shape: the title names the change and the patient,
+    the body carries the essentials, the tap opens the exact record.
+    `urgent` mirrors the feed's ack-required flag (escalations,
+    consult requests, new assignments) — no separate taxonomy."""
+    body = item["text"]
+    if item.get("ack_required") and not item.get("acked"):
+        body += " · Acknowledgment required"
+    return {
+        "title": f"{item['label'].upper()} — {item['patient_name']}",
+        "body": body,
+        "url": url_for("patient_page", case_id=item["case_id"],
+                       section=item["section"], hl=item["hl"], _external=True),
+        "tag": item["key"],
+        "urgent": bool(item.get("ack_required")),
+    }
+
+PUSH_SEEN_CAP = 300   # feed keys remembered per clinician
+PUSH_BURST_CAP = 5    # max pushes per clinician per action — a burst
+                      # still lands in the bell/Center in full
+
+def dispatch_push_notifications(actor_id=None):
+    """After any state-changing action, push feed items that are new
+    to each subscribed clinician. The bell feed is the single source
+    of truth, so push coverage is exactly the bell's coverage (stored
+    disposition chain + derived history events + consult stages) and
+    the actor is never alerted about their own action — their feed
+    excludes it by construction. Each subscription starts from a
+    baseline of what was already in the feed when it was created, so
+    nobody is ever pushed the backlog. Dead subscriptions (404/410)
+    are pruned as they are found."""
+    care = load_care()
+    subs_by_user = care.get("push_subscriptions", {})
+    if not subs_by_user:
+        return
+    handoffs = load_handoffs()
+    meta = user_meta()
+    state = care.setdefault("push_state", {})
+    changed = False
+    for uid, subs in list(subs_by_user.items()):
+        if not subs:
+            continue
+        user = USERS.get(str(uid))
+        if user is None:
+            continue
+        feed = notification_feed(user, handoffs, care, meta)
+        st = state.setdefault(str(uid), {"seen": []})
+        seen = set(st.get("seen", []))
+        fresh = [it for it in feed if it["key"] not in seen]
+        if fresh and str(uid) != str(actor_id):
+            dead = []
+            for it in fresh[:PUSH_BURST_CAP]:
+                payload = _push_payload(it)
+                for sub in subs:
+                    try:
+                        send_web_push(sub, payload)
+                    except PushGoneError:
+                        dead.append(sub.get("endpoint"))
+                    except Exception:
+                        pass
+            if dead:
+                subs_by_user[uid] = [s for s in subs
+                                      if s.get("endpoint") not in dead]
+                changed = True
+        merged = list(dict.fromkeys(
+            [it["key"] for it in feed] + st.get("seen", [])))[:PUSH_SEEN_CAP]
+        if merged != st.get("seen"):
+            st["seen"] = merged
+            changed = True
+    if changed:
+        save_care(care)
+
+_NO_DISPATCH_ENDPOINTS = {"push_subscribe", "push_unsubscribe", "login", "logout"}
+
+@app.after_request
+def _push_after_request(response):
+    """Any successful POST is a potential chart change; let the
+    dispatcher diff the feeds and push what is new. Failures in the
+    alert channel are swallowed whole — they must never surface in,
+    or break, the clinical workflow itself."""
+    try:
+        if (request.method == "POST" and response.status_code < 400
+                and request.endpoint not in _NO_DISPATCH_ENDPOINTS
+                and getattr(current_user, "is_authenticated", False)):
+            dispatch_push_notifications(actor_id=current_user.id)
+    except Exception:
+        pass
+    return response
+
+@app.route("/sw.js")
+def service_worker():
+    """The service worker must be served from the root path to own
+    the whole origin's scope."""
+    resp = app.send_static_file("sw.js")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+@app.route("/manifest.webmanifest")
+def web_manifest():
+    """Installability (and iPhone Home-Screen push) needs a manifest:
+    name, standalone display, and 192/512 icons."""
+    body = {
+        "name": "Handoff — Care Coordination",
+        "short_name": "Handoff",
+        "description": "Patient handoff and care coordination — alerts like a clinical text, tap to open the exact record.",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#0b1828",
+        "theme_color": "#10233c",
+        "icons": [
+            {"src": url_for("static", filename="img/icon-192.png"),
+             "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": url_for("static", filename="img/icon-512.png"),
+             "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ],
+    }
+    return Response(json.dumps(body), mimetype="application/manifest+json")
+
+@app.route("/api/push/key")
+@login_required
+def api_push_key():
+    """The VAPID public key the browser subscribes with. Only the
+    public half ever leaves the server."""
+    pub, _pem, _subject = _vapid_keys()
+    return {"publicKey": pub}
+
+@app.route("/push/subscribe", methods=["POST"])
+@login_required
+def push_subscribe():
+    """Register this device for the signed-in clinician's phone
+    alerts. One clinician may carry several devices; re-registering
+    the same browser replaces its entry. The feed as it stands right
+    now becomes the baseline — the phone buzzes for changes from this
+    moment on, never for the backlog."""
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint")
+    keys = data.get("keys") or {}
+    if not endpoint or not keys.get("p256dh") or not keys.get("auth"):
+        return {"ok": False, "error": "invalid subscription"}, 400
+    care = load_care()
+    uid = str(current_user.id)
+    subs = care.setdefault("push_subscriptions", {}).setdefault(uid, [])
+    subs[:] = [s for s in subs if s.get("endpoint") != endpoint] + [{
+        "endpoint": endpoint,
+        "keys": {"p256dh": keys["p256dh"], "auth": keys["auth"]},
+        "ua": (request.headers.get("User-Agent") or "")[:200],
+        "at": now_iso(),
+    }]
+    feed = notification_feed(current_user, load_handoffs(), care, user_meta())
+    st = care.setdefault("push_state", {}).setdefault(uid, {"seen": []})
+    st["seen"] = list(dict.fromkeys(
+        [it["key"] for it in feed] + st.get("seen", [])))[:PUSH_SEEN_CAP]
+    save_care(care)
+    return {"ok": True, "devices": len(subs)}
+
+@app.route("/push/unsubscribe", methods=["POST"])
+@login_required
+def push_unsubscribe():
+    """Remove one device's subscription for the signed-in clinician."""
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint")
+    care = load_care()
+    uid = str(current_user.id)
+    subs = care.setdefault("push_subscriptions", {}).get(uid, [])
+    care["push_subscriptions"][uid] = [s for s in subs
+                                       if s.get("endpoint") != endpoint]
+    save_care(care)
+    return {"ok": True}
 
 # -----------------------------
 # Create a handoff

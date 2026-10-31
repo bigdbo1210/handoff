@@ -18,3 +18,16 @@ services:
         value: "0"
       - key: HANDOFF_SECRET_KEY
         generateValue: true
+      # Web Push phone alerts: durable VAPID keys live ONLY in the
+      # dashboard (sync: false — never in this repo). Set
+      # HANDOFF_VAPID_PUBLIC_KEY + HANDOFF_VAPID_PRIVATE_KEY (and
+      # optionally HANDOFF_VAPID_SUBJECT, a mailto:) there so phone
+      # subscriptions survive restarts. Without them the app generates
+      # an in-memory keypair per boot and phones must re-enable alerts
+      # after each restart.
+      - key: HANDOFF_VAPID_PUBLIC_KEY
+        sync: false
+      - key: HANDOFF_VAPID_PRIVATE_KEY
+        sync: false
+      - key: HANDOFF_VAPID_SUBJECT
+        sync: false
